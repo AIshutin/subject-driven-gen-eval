@@ -1,0 +1,30 @@
+export WANDB_MODE="offline"
+export SUBJECT_NAME=$1
+export CONCEPT_NAME="htazawa" # sts is bad one, since it's a rifle
+export CLASS_NAME=$2
+export MODEL_NAME="stabilityai/stable-diffusion-2-1"
+export INSTANCE_DIR="datasets/dreambooth/${SUBJECT_NAME}"
+export CLASS_DIR="../synth-dataset-sd-2-1/${CLASS_NAME}"
+export OUTPUT_DIR="checkpoints/${SUBJECT_NAME}/db-sd2.1"
+export WANDB_NAME="db-sd2.1-${SUBJECT_NAME}-${CLASS_NAME}"
+
+accelerate launch train_dreambooth.py \
+  --pretrained_model_name_or_path=$MODEL_NAME  \
+  --instance_data_dir=$INSTANCE_DIR \
+  --class_data_dir=$CLASS_DIR \
+  --output_dir=$OUTPUT_DIR \
+  --with_prior_preservation --prior_loss_weight=1.0 \
+  --instance_prompt="a photo of ${CONCEPT_NAME} ${CLASS_NAME//_/ }" \
+  --class_prompt="a photo of ${CLASS_NAME//_/ }" \
+  --resolution=768 \
+  --train_batch_size=1 \
+  --gradient_accumulation_steps=1 \
+  --learning_rate=5e-6 \
+  --lr_scheduler="constant" \
+  --lr_warmup_steps=0 \
+  --num_class_images=1000 \
+  --max_train_steps=1600 \
+  --checkpointing_steps=200 \
+  --report_to wandb \
+  --sample_batch_size=10 \
+  --seed=42

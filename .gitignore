@@ -6,6 +6,8 @@ runs
 generated
 out
 datasets/dreambooth/*
+checkpoints
+run-logs
 
 # C extensions
 *.so
