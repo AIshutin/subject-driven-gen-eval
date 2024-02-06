@@ -8,5 +8,5 @@ Run this code to download dataset:
 
 ```bash
 git clone https://github.com/google/dreambooth
-mv dreambooth/dataset .
+mv dreambooth/dataset/* .
 ```

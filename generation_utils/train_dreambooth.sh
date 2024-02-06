@@ -1,6 +1,6 @@
 export WANDB_MODE="offline"
 export SUBJECT_NAME=$1
-export CONCEPT_NAME="htazawa" # sts is bad one, since it's a rifle
+export CONCEPT_NAME="htazawa" # sts is a bad one, since it's a rifle
 export CLASS_NAME=$2
 export MODEL_NAME="stabilityai/stable-diffusion-2-1"
 export INSTANCE_DIR="datasets/dreambooth/${SUBJECT_NAME}"
@@ -8,7 +8,7 @@ export CLASS_DIR="../synth-dataset-sd-2-1/${CLASS_NAME}"
 export OUTPUT_DIR="checkpoints/${SUBJECT_NAME}/db-sd2.1"
 export WANDB_NAME="db-sd2.1-${SUBJECT_NAME}-${CLASS_NAME}"
 
-accelerate launch train_dreambooth.py \
+accelerate launch generation_utils/train_dreambooth.py \
   --pretrained_model_name_or_path=$MODEL_NAME  \
   --instance_data_dir=$INSTANCE_DIR \
   --class_data_dir=$CLASS_DIR \

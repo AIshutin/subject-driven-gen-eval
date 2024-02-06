@@ -1,4 +1,3 @@
-torch>=1.7.1
-torchvision
+diffusers
 git+https://github.com/openai/CLIP.git
 tqdm
