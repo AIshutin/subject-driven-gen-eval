@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=dreambooth-berry_bowl
-#SBATCH --error=run-logs/dreambooth-berry_bowl-%j.err
-#SBATCH --output=run-logs/dreambooth-berry_bowl-%j.log
+#SBATCH --job-name=dreambooth
+#SBATCH --error=run-logs/dreambooth-%j.err
+#SBATCH --output=run-logs/dreambooth-%j.log
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=5
 #SBATCH --time=3:00:00
@@ -22,21 +22,23 @@ python -V
 conda list
 nvcc --version
 
-export PROMPTS=datasets/dreambooth/creature_prompts.json
-export CLASS_NAME=bowl
-export SUBJECT_NAME=berry_bowl
+export PROMPTS=datasets/dreambooth/$3_prompts.json
+export SUBJECT_NAME=$1
+export CLASS_NAME=$2
 export OUTPUT_DIR="checkpoints/${SUBJECT_NAME}/db-sd2.1"
 
 bash generation_utils/train_dreambooth.sh $SUBJECT_NAME $CLASS_NAME
 
-declare -a arr=("step800" "step1000" "step1200" "step1400" "step1600")
+declare -a arr=("800" "1000" "1200" "1400" "1600")
 for i in "${arr[@]}"
 do
-   python3 generation_utils/inference.py --checkpoint "$OUTPUT_DIR/$i" \
+   python3 generation_utils/inference.py --checkpoint "$OUTPUT_DIR/checkpoint-$i" \
                         --prompts $PROMPTS \
                         --class_name $CLASS_NAME \
                         --descriptor htazawa \
-                        --output_dir generated/$SUBJECT_NAME/dreambooth-sd2.1-$i
+                        --output_dir generated/$SUBJECT_NAME/dreambooth-sd2.1-step$i \
+                        --seed 42
+   rm -r "$OUTPUT_DIR/checkpoint-$i"
 done
 
 rm -r $OUTPUT_DIR

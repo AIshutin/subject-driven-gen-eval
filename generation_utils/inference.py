@@ -12,39 +12,6 @@ from tqdm.auto import tqdm
 import json
 
 
-'''
-    def unwrap_model(model):
-        model = accelerator.unwrap_model(model)
-        model = model._orig_mod if is_compiled_module(model) else model
-        return model
-
-    # create custom saving & loading hooks so that `accelerator.save_state(...)` serializes in a nice format
-    def save_model_hook(models, weights, output_dir):
-        if accelerator.is_main_process:
-            for model in models:
-                sub_dir = "unet" if isinstance(model, type(unwrap_model(unet))) else "text_encoder"
-                model.save_pretrained(os.path.join(output_dir, sub_dir))
-
-                # make sure to pop weight so that corresponding model is not saved again
-                weights.pop()
-
-    def load_model_hook(models, input_dir):
-        while len(models) > 0:
-            # pop models so that they are not loaded again
-            model = models.pop()
-
-            if isinstance(model, type(unwrap_model(text_encoder))):
-                # load transformers style into model
-                load_model = text_encoder_cls.from_pretrained(input_dir, subfolder="text_encoder")
-                model.config = load_model.config
-            else:
-                # load diffusers style into model
-                load_model = UNet2DConditionModel.from_pretrained(input_dir, subfolder="unet")
-                model.register_to_config(**load_model.config)
-
-            model.load_state_
-'''
-
 def main(pipeline, device, args):
     image_dir = args.output_dir
     image_dir.mkdir(parents=True, exist_ok=True)
@@ -168,13 +135,16 @@ if __name__ == "__main__":
     )
 
     if args.checkpoint:
+        changed = False
         if (args.checkpoint / 'unet').exists():
-            print('SSS')
             pipeline.unet = UNet2DConditionModel.from_pretrained(args.checkpoint, subfolder="unet")
+            changed = True
         if (args.checkpoint / 'text_encoder').exists():
             cls = pipeline.text_encoder.__class__
             pipeline.text_encoder = cls.from_pretrained(args.checkpoint, subfolder='text_encoder')            
-    
+            changed = True
+        assert(changed)
+ 
     pipeline.to(device)
     pipeline.set_progress_bar_config(disable=True)
     
