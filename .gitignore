@@ -8,6 +8,7 @@ out
 datasets/dreambooth/*
 checkpoints
 run-logs
+wandb
 
 # C extensions
 *.so
