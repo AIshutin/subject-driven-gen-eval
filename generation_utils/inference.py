@@ -5,6 +5,7 @@ from diffusers import (
     DiffusionPipeline,
     StableDiffusionPipeline,
     UNet2DConditionModel,
+    DPMSolverMultistepScheduler
 )
 import torch
 from pathlib import Path
@@ -34,21 +35,22 @@ def main(pipeline, device, args):
 
     for prompt in tqdm(validation_prompts, desc="generating images with advanced prompts"):
         prompt_image_rows.append([prompt])
-        with torch.autocast("cuda"):
+        while len(prompt_image_rows[-1]) - 1 < args.num_prompted_images:
+            cnt_images = min(args.num_prompted_images + 1 - len(prompt_image_rows[-1]),
+                             args.sample_batch_size)
             images = pipeline(prompt=prompt, num_inference_steps=args.num_inference_steps, 
-                              generator=generator, num_images_per_prompt=args.num_prompted_images,
-                              verbose=False).images
+                              generator=generator, num_images_per_prompt=cnt_images,
+                              verbose=False, eta=args.eta).images
             prompt_image_rows[-1].extend(images)
-    
 
     for _ in tqdm(range((args.num_baseline_images - 1) // args.sample_batch_size + 1), 
                     desc="generating images with base prompt"):
-        with torch.autocast("cuda"):
-            images = pipeline(prompt=f"a photo of a {args.descriptor_name} {args.class_name}",
-                              num_inference_steps=args.num_inference_steps,
-                              generator=generator,
-                              num_images_per_prompt=args.sample_batch_size).images
-            normal_images.extend(images)
+        images = pipeline(prompt=f"a photo of a {args.descriptor_name} {args.class_name}",
+                          num_inference_steps=args.num_inference_steps,
+                          generator=generator,
+                          num_images_per_prompt=args.sample_batch_size).images
+        
+        normal_images.extend(images)
     
     cnt = 0
     for el in prompt_image_rows:
@@ -127,12 +129,19 @@ if __name__ == "__main__":
         "--seed",
         type=int
     )
+    parser.add_argument(
+        "--eta",
+        type=float,
+        default=0.0
+    )
     args = parser.parse_args()
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     pipeline = DiffusionPipeline.from_pretrained(
         args.pretrained_model_name_or_path
     )
+    pipeline.scheduler = DPMSolverMultistepScheduler.from_config(pipeline.scheduler.config)
+    pipeline.to(device)
 
     if args.checkpoint:
         changed = False
@@ -143,9 +152,18 @@ if __name__ == "__main__":
             cls = pipeline.text_encoder.__class__
             pipeline.text_encoder = cls.from_pretrained(args.checkpoint, subfolder='text_encoder')            
             changed = True
+        if (args.checkpoint / 'pytorch_custom_diffusion_weights.bin').exists():
+            pipeline.unet.load_attn_procs(args.checkpoint, 
+                                          weight_name="pytorch_custom_diffusion_weights.bin")
+
+            changed = True
+        if (args.checkpoint / f'{args.descriptor_name}.bin').exists():
+            pipeline.load_textual_inversion(args.checkpoint, 
+                                            weight_name=f'{args.descriptor_name}.bin')
+            changed = True
         assert(changed)
  
-    pipeline.to(device)
     pipeline.set_progress_bar_config(disable=True)
-    
+    torch.cuda.empty_cache()
+
     main(pipeline, device, args)

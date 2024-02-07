@@ -1,4 +1,5 @@
 # subject-driven-gen-eval
+
 [WIP] Utils to evaluate subject-driven generation methods like Dreambooth.
 
 ### Installation
@@ -12,11 +13,13 @@ pip install -r requiremens.txt
 pip install -r script_requirements.txt
 ```
 
+You might also need `wkhtmltopdf` in case you want to make comparison jpg
+
 ### Examples
 
 Note: download dreambooth dataset before using it!
 
 ```bash
-python3 generation_utils/inference.py --prompts datasets/dreambooth/creature_prompts.json --class_name dog --output_dir generated/dog/baseline
+python3 generation_utils/inference.py --prompts datasets/dreambooth/creature_prompts.json --class_name dog --output_dir generated/baseline/dog/sd2.1
 python3 evaluate.py --prompts generated/dog/baseline/description.json --realimages datasets/dreambooth/dog
 ```

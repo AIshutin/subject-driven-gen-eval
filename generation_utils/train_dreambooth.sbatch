@@ -25,7 +25,7 @@ nvcc --version
 export PROMPTS=datasets/dreambooth/$3_prompts.json
 export SUBJECT_NAME=$1
 export CLASS_NAME=$2
-export OUTPUT_DIR="checkpoints/${SUBJECT_NAME}/db-sd2.1"
+export OUTPUT_DIR="checkpoints/dreambooth/${SUBJECT_NAME}/sd2.1"
 
 bash generation_utils/train_dreambooth.sh $SUBJECT_NAME $CLASS_NAME
 
@@ -36,9 +36,7 @@ do
                         --prompts $PROMPTS \
                         --class_name $CLASS_NAME \
                         --descriptor htazawa \
-                        --output_dir generated/$SUBJECT_NAME/dreambooth-sd2.1-step$i \
+                        --output_dir generated/dreambooth/$SUBJECT_NAME/sd2.1-step$i \
                         --seed 42
    rm -r "$OUTPUT_DIR/checkpoint-$i"
 done
-
-rm -r $OUTPUT_DIR

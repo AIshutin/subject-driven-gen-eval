@@ -9,6 +9,10 @@ datasets/dreambooth/*
 checkpoints
 run-logs
 wandb
+comparison_results
+img-table.jpg
+img-table.html
+evaluation_results/
 
 # C extensions
 *.so

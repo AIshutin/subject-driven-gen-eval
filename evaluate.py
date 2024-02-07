@@ -131,5 +131,5 @@ if __name__ == "__main__":
     if not args.silent:
         print(f"DINO: {metrics['DINO']:.3f}")
     else:
-        print(json.dumps(metrics, indent=4))
+        print(json.dumps(metrics))
 
