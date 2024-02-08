@@ -2,7 +2,7 @@ export WANDB_MODE="offline"
 export SUBJECT_NAME=$1
 export CONCEPT_NAME="htazawa" # sts is bad one, since it's a rifle
 export CLASS_NAME=$2
-export MODEL_NAME="stabilityai/stable-diffusion-2-1"
+export MODEL_NAME="stabilityai/stable-diffusion-2-1-base"
 export INSTANCE_DIR="datasets/dreambooth/${SUBJECT_NAME}"
 export CLASS_DIR="../synth-dataset-sd-2-1/${CLASS_NAME}"
 export OUTPUT_DIR="checkpoints/dreambooth/${SUBJECT_NAME}/sd2.1"
@@ -16,16 +16,19 @@ accelerate launch generation_utils/train_dreambooth.py \
   --with_prior_preservation --prior_loss_weight=1.0 \
   --instance_prompt="a photo of a ${CONCEPT_NAME} ${CLASS_NAME//_/ }" \
   --class_prompt="a photo of a ${CLASS_NAME//_/ }" \
-  --resolution=768 \
+  --resolution=512 \
   --train_batch_size=1 \
   --gradient_accumulation_steps=1 \
   --learning_rate=5e-6 \
   --lr_scheduler="constant" \
   --lr_warmup_steps=0 \
   --num_class_images=1000 \
-  --max_train_steps=1600 \
+  --max_train_steps=2000 \
   --checkpointing_steps=200 \
   --report_to wandb \
   --sample_batch_size=10 \
   --seed=42 \
-  --validation_prompt="a photo of a ${CONCEPT_NAME} ${CLASS_NAME//_/ }"
+  --validation_prompt "a photo of a ${CONCEPT_NAME} ${CLASS_NAME//_/ }" \
+                      "a photo of a ${CONCEPT_NAME} ${CLASS_NAME//_/ } at school" \
+                      "a photo of a ${CONCEPT_NAME} ${CLASS_NAME//_/ } in bronze" \
+  --num_validation_images 3

@@ -160,21 +160,26 @@ def log_validation(
     pipeline.set_progress_bar_config(disable=True)
 
     if args.pre_compute_text_embeddings:
+        raise Exception()
         pipeline_args = {
             "prompt_embeds": prompt_embeds,
             "negative_prompt_embeds": negative_prompt_embeds,
         }
     else:
-        pipeline_args = {"prompt": args.validation_prompt}
+        pass
+        # pipeline_args = {"prompt": args.validation_prompt}
 
     # run inference
     generator = None if args.seed is None else torch.Generator(device=accelerator.device).manual_seed(args.seed)
     images = []
     if args.validation_images is None:
         for _ in range(args.num_validation_images):
-            with torch.autocast("cuda"):
-                image = pipeline(**pipeline_args, num_inference_steps=25, generator=generator).images[0]
-            images.append(image)
+            for prompt in args.validation_prompt:
+                with torch.autocast("cuda"):
+                    image = pipeline(prompt=prompt, 
+                                     num_inference_steps=25, 
+                                     generator=generator).images[0]
+                images.append(image)
     else:
         for image in args.validation_images:
             image = Image.open(image)
@@ -189,7 +194,7 @@ def log_validation(
             tracker.log(
                 {
                     "validation": [
-                        wandb.Image(image, caption=f"{i}: {args.validation_prompt}") for i, image in enumerate(images)
+                        wandb.Image(image, caption=f"{i}: {args.validation_prompt[i % len(args.validation_prompt)]}") for i, image in enumerate(images)
                     ]
                 }
             )
@@ -464,8 +469,9 @@ def parse_args(input_args=None):
     parser.add_argument(
         "--validation_prompt",
         type=str,
+        nargs='+',
         default=None,
-        help="A prompt that is used during validation to verify that the model is learning.",
+        help="Prompt(s) that is/are used during validation to verify that the model is learning.",
     )
     parser.add_argument(
         "--num_validation_images",
@@ -941,7 +947,9 @@ def main(args):
         if accelerator.is_main_process:
             for model in models:
                 sub_dir = "unet" if isinstance(model, type(unwrap_model(unet))) else "text_encoder"
-                model.save_pretrained(os.path.join(output_dir, sub_dir))
+                
+                if sub_dir != 'text_encoder':
+                    model.save_pretrained(os.path.join(output_dir, sub_dir))
 
                 # make sure to pop weight so that corresponding model is not saved again
                 weights.pop()
@@ -953,15 +961,19 @@ def main(args):
 
             if isinstance(model, type(unwrap_model(text_encoder))):
                 # load transformers style into model
-                load_model = text_encoder_cls.from_pretrained(input_dir, subfolder="text_encoder")
-                model.config = load_model.config
+                # load_model = text_encoder_cls.from_pretrained(input_dir, subfolder="text_encoder")
+                # model.config = load_model.config
+                print('Tried to load text_encoder')
+
+                # model.load_state_dict(load_model.state_dict())
+                # del load_model
             else:
                 # load diffusers style into model
                 load_model = UNet2DConditionModel.from_pretrained(input_dir, subfolder="unet")
                 model.register_to_config(**load_model.config)
 
-            model.load_state_dict(load_model.state_dict())
-            del load_model
+                model.load_state_dict(load_model.state_dict())
+                del load_model
 
     accelerator.register_save_state_pre_hook(save_model_hook)
     accelerator.register_load_state_pre_hook(load_model_hook)
@@ -1346,6 +1358,10 @@ def main(args):
 
                         save_path = os.path.join(args.output_dir, f"checkpoint-{global_step}")
                         accelerator.save_state(save_path)
+                        os.system(f"rm {save_path}/optimizer.bin")
+                        os.system(f"rm {save_path}/random_states_0.pkl")
+                        os.system(f"rm {save_path}/scheduler.bin")
+
                         logger.info(f"Saved state to {save_path}")
 
                     images = []

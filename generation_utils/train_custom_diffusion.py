@@ -372,6 +372,7 @@ def parse_args(input_args=None):
         "--validation_prompt",
         type=str,
         default=None,
+        nargs="+",
         help="A prompt that is used during validation to verify that the model is learning.",
     )
     parser.add_argument(
@@ -1247,12 +1248,12 @@ def main(args):
 
                     # run inference
                     generator = torch.Generator(device=accelerator.device).manual_seed(args.seed)
-                    images = [
-                        pipeline(args.validation_prompt, num_inference_steps=25, generator=generator, eta=1.0).images[
-                            0
-                        ]
-                        for _ in range(args.num_validation_images)
-                    ]
+                    images = []
+                    for _ in range(args.num_validation_images):
+                        for prompt in args.validation_prompt:
+                            images.append(
+                                pipeline(prompt, num_inference_steps=25, generator=generator, eta=1.0).images[0]
+                            )
 
                     for tracker in accelerator.trackers:
                         if tracker.name == "tensorboard":
@@ -1262,7 +1263,7 @@ def main(args):
                             tracker.log(
                                 {
                                     "validation": [
-                                        wandb.Image(image, caption=f"{i}: {args.validation_prompt}")
+                                        wandb.Image(image, caption=f"{i}: {args.validation_prompt[i % len(args.validation_prompt)]}")
                                         for i, image in enumerate(images)
                                     ]
                                 }

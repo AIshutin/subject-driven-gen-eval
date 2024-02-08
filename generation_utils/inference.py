@@ -38,7 +38,7 @@ def main(pipeline, device, args):
         while len(prompt_image_rows[-1]) - 1 < args.num_prompted_images:
             cnt_images = min(args.num_prompted_images + 1 - len(prompt_image_rows[-1]),
                              args.sample_batch_size)
-            images = pipeline(prompt=prompt, num_inference_steps=args.num_inference_steps, 
+            images = pipeline(prompt="a photo of " + prompt, num_inference_steps=args.num_inference_steps, 
                               generator=generator, num_images_per_prompt=cnt_images,
                               verbose=False, eta=args.eta).images
             prompt_image_rows[-1].extend(images)
@@ -74,7 +74,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--pretrained_model_name_or_path",
         type=str,
-        default="stabilityai/stable-diffusion-2-1",
+        default="stabilityai/stable-diffusion-2-1-base",
         help="Path to pretrained model or model identifier from huggingface.co/models.",
     )
     parser.add_argument(
@@ -118,7 +118,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--num_inference_steps",
         type=int,
-        default=25,
+        default=200, # as in Custom Diffusion paper
     )
     parser.add_argument(
         "--output_dir",
@@ -140,8 +140,8 @@ if __name__ == "__main__":
     pipeline = DiffusionPipeline.from_pretrained(
         args.pretrained_model_name_or_path
     )
-    pipeline.scheduler = DPMSolverMultistepScheduler.from_config(pipeline.scheduler.config)
-    pipeline.to(device)
+    pipeline.scheduler = DDPMScheduler.from_config(pipeline.scheduler.config)
+
 
     if args.checkpoint:
         changed = False
@@ -163,7 +163,8 @@ if __name__ == "__main__":
             changed = True
         assert(changed)
  
-    pipeline.set_progress_bar_config(disable=True)
+    pipeline.set_progress_bar_config(disable=True)    
+    pipeline.to(device)
     torch.cuda.empty_cache()
 
     main(pipeline, device, args)
