@@ -22,7 +22,6 @@ python -V
 conda list
 nvcc --version
 
-export PROMPTS=datasets/dreambooth/$3_prompts.json
 export SUBJECT_NAME=$1
 export CLASS_NAME=$2
 

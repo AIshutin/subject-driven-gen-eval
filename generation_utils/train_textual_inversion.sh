@@ -1,4 +1,4 @@
-export WANDB_MODE="online" #"offline"
+export WANDB_MODE="offline" #"offline"
 export SUBJECT_NAME=$1
 export CONCEPT_NAME="<htazawa>" # sts is bad one, since it's a rifle
 export CLASS_NAME=$2

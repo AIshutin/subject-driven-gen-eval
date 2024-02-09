@@ -1214,7 +1214,17 @@ def main(args):
                                     shutil.rmtree(removing_checkpoint)
 
                         save_path = os.path.join(args.output_dir, f"checkpoint-{global_step}")
-                        accelerator.save_state(save_path)
+                        # accelerator.save_state(save_path)
+                        # unet = unet.to(torch.float32)
+                        unet.save_attn_procs(save_path, safe_serialization=not args.no_safe_serialization)
+                        save_new_embed(
+                            text_encoder,
+                            modifier_token_id,
+                            accelerator,
+                            args,
+                            save_path,
+                            safe_serialization=not args.no_safe_serialization,
+                        )
                         logger.info(f"Saved state to {save_path}")
 
             logs = {"loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
