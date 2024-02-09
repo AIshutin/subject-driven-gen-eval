@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH --job-name=dreambooth
-#SBATCH --error=run-logs/dreambooth-%j.err
-#SBATCH --output=run-logs/dreambooth-%j.log
+#SBATCH --job-name=textual_inversion
+#SBATCH --error=run-logs/textual_inversion-%j.err
+#SBATCH --output=run-logs/textual_inversion-%j.log
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=5
-#SBATCH --time=3:00:00
+#SBATCH --time=7:00:00
 #SBATCH --constraint="[type_a|type_b|type_c]"
 
 module purge
@@ -26,4 +26,4 @@ export PROMPTS=datasets/dreambooth/$3_prompts.json
 export SUBJECT_NAME=$1
 export CLASS_NAME=$2
 
-bash generation_utils/train_dreambooth.sh $SUBJECT_NAME $CLASS_NAME
+bash generation_utils/train_textual_inversion.sh $SUBJECT_NAME $CLASS_NAME

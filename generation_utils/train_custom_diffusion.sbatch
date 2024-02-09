@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=dreambooth
-#SBATCH --error=run-logs/dreambooth-%j.err
-#SBATCH --output=run-logs/dreambooth-%j.log
+#SBATCH --job-name=custom_diffusion
+#SBATCH --error=run-logs/custom_diffusion-%j.err
+#SBATCH --output=run-logs/custom_diffusion-%j.log
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=5
 #SBATCH --time=3:00:00
@@ -26,4 +26,4 @@ export PROMPTS=datasets/dreambooth/$3_prompts.json
 export SUBJECT_NAME=$1
 export CLASS_NAME=$2
 
-bash generation_utils/train_dreambooth.sh $SUBJECT_NAME $CLASS_NAME
+bash generation_utils/train_custom_diffusion.sh $SUBJECT_NAME $CLASS_NAME
