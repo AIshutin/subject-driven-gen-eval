@@ -33,4 +33,5 @@ accelerate launch generation_utils/train_custom_diffusion.py \
                       "a photo of a ${CONCEPT_NAME} ${CLASS_NAME//_/ } in bronze" \
   --no_safe_serialization \
   --checkpointing_steps 50 \
-  --validation_steps 50
+  --validation_steps 50 \
+  --num_validation_images 3
