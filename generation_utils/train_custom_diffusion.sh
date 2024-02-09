@@ -1,11 +1,11 @@
 export WANDB_MODE="offline"
 export SUBJECT_NAME=$1
-export CONCEPT_NAME="htazawa" # sts is bad one, since it's a rifle
+export CONCEPT_NAME="<htazawa>" # sts is bad one, since it's a rifle
 export CLASS_NAME=$2
 export MODEL_NAME="stabilityai/stable-diffusion-2-1-base"
 export INSTANCE_DIR="datasets/dreambooth/${SUBJECT_NAME}"
 export CLASS_DIR="../synth-dataset-sd-2-1/${CLASS_NAME}"
-export OUTPUT_DIR="checkpoints/${SUBJECT_NAME}/cd-sd2.1"
+export OUTPUT_DIR="checkpoints/custom_diffusion/${SUBJECT_NAME}/sd2.1"
 export WANDB_NAME="cd-sd2.1-${SUBJECT_NAME}-${CLASS_NAME}"
 
 accelerate launch generation_utils/train_custom_diffusion.py \
@@ -14,7 +14,7 @@ accelerate launch generation_utils/train_custom_diffusion.py \
   --class_data_dir=$CLASS_DIR \
   --output_dir=$OUTPUT_DIR \
   --with_prior_preservation --prior_loss_weight=1.0 \
-  --instance_prompt="a photo of a <${CONCEPT_NAME}> ${CLASS_NAME//_/ }" \
+  --instance_prompt="a photo of a ${CONCEPT_NAME} ${CLASS_NAME//_/ }" \
   --class_prompt="a photo of a ${CLASS_NAME//_/ }" \
   --num_class_images=200 \
   --resolution=512  \
@@ -24,10 +24,13 @@ accelerate launch generation_utils/train_custom_diffusion.py \
   --lr_warmup_steps=0 \
   --max_train_steps=500 \
   --scale_lr --hflip  \
-  --modifier_token "<${CONCEPT_NAME}>" \
+  --modifier_token "${CONCEPT_NAME}" \
   --report_to wandb \
   --sample_batch_size=10 \
   --seed=42 \
-  --validation_prompt="a photo of a <${CONCEPT_NAME}> ${CLASS_NAME//_/ }" \
+  --validation_prompt "a photo of a ${CONCEPT_NAME} ${CLASS_NAME//_/ }" \
+                      "a photo of a ${CONCEPT_NAME} ${CLASS_NAME//_/ } at school" \
+                      "a photo of a ${CONCEPT_NAME} ${CLASS_NAME//_/ } in bronze" \
   --no_safe_serialization \
-  --checkpointing_steps 50
+  --checkpointing_steps 50 \
+  --validation_steps 50

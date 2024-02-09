@@ -25,6 +25,7 @@ accelerate launch generation_utils/train_dreambooth.py \
   --num_class_images=1000 \
   --max_train_steps=2000 \
   --checkpointing_steps=200 \
+  --validation_steps 200 \
   --report_to wandb \
   --sample_batch_size=10 \
   --seed=42 \

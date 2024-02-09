@@ -28,15 +28,3 @@ export CLASS_NAME=$2
 export OUTPUT_DIR="checkpoints/dreambooth/${SUBJECT_NAME}/sd2.1"
 
 bash generation_utils/train_dreambooth.sh $SUBJECT_NAME $CLASS_NAME
-
-# declare -a arr=("800" "1000" "1200" "1400" "1600")
-# for i in "${arr[@]}"
-# do
-#   python3 generation_utils/inference.py --checkpoint "$OUTPUT_DIR/checkpoint-$i" \
-#                        --prompts $PROMPTS \
-#                        --class_name $CLASS_NAME \
-#                        --descriptor htazawa \
-#                        --output_dir generated/dreambooth/$SUBJECT_NAME/sd2.1-step$i \
-#                        --seed 42
-#   rm -r "$OUTPUT_DIR/checkpoint-$i"
-# done
