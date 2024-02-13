@@ -114,7 +114,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--scale_guidance",
-        type=int,
+        type=float,
         default=6,
         help="Scale guidance (classfier-free guidance)"
     )
@@ -143,6 +143,8 @@ if __name__ == "__main__":
         default=0.0
     )
     args = parser.parse_args()
+    if args.class_name == '_' or args.class_name == '-':
+        args.class_name = ''
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     pipeline = DiffusionPipeline.from_pretrained(
@@ -163,11 +165,18 @@ if __name__ == "__main__":
         if (args.checkpoint / 'pytorch_custom_diffusion_weights.bin').exists():
             pipeline.unet.load_attn_procs(args.checkpoint, 
                                           weight_name="pytorch_custom_diffusion_weights.bin")
-
             changed = True
         if (args.checkpoint / f'{args.descriptor_name}.bin').exists():
             pipeline.load_textual_inversion(args.checkpoint, 
                                             weight_name=f'{args.descriptor_name}.bin')
+            changed = True
+        if (args.checkpoint / 'tokenizer').exists():
+            from transformers import CLIPTokenizer
+            pipeline.tokenizer = CLIPTokenizer.from_pretrained(args.checkpoint, subfolder="tokenizer")
+            changed = True
+        if (args.checkpoint / 'text_encoder').exists():
+            from transformers import CLIPTextModel
+            pipeline.text_encoder = CLIPTextModel.from_pretrained(args.checkpoint, subfolder="text_encoder")
             changed = True
         assert(changed)
  
