@@ -40,7 +40,8 @@ def main(pipeline, device, args):
                              args.sample_batch_size)
             images = pipeline(prompt="a photo of " + prompt, num_inference_steps=args.num_inference_steps, 
                               generator=generator, num_images_per_prompt=cnt_images,
-                              verbose=False, eta=args.eta).images
+                              verbose=False, eta=args.eta,
+                              scale_guidance=args.scale_guidance).images
             prompt_image_rows[-1].extend(images)
 
     for _ in tqdm(range((args.num_baseline_images - 1) // args.sample_batch_size + 1), 
@@ -48,7 +49,8 @@ def main(pipeline, device, args):
         images = pipeline(prompt=f"a photo of a {args.descriptor_name} {args.class_name}",
                           num_inference_steps=args.num_inference_steps,
                           generator=generator,
-                          num_images_per_prompt=args.sample_batch_size).images
+                          num_images_per_prompt=args.sample_batch_size,
+                          scale_guidance=args.scale_guidance).images
         
         normal_images.extend(images)
     
@@ -111,6 +113,12 @@ if __name__ == "__main__":
         help="Number of images per prompt to generate with advanced prompts"
     )
     parser.add_argument(
+        "--scale_guidance",
+        type=int,
+        default=6,
+        help="Scale guidance (classfier-free guidance)"
+    )
+    parser.add_argument(
         "--sample_batch_size",
         type=int,
         default=4
@@ -118,7 +126,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--num_inference_steps",
         type=int,
-        default=200, # as in Custom Diffusion paper
+        default=50,
     )
     parser.add_argument(
         "--output_dir",

@@ -31,6 +31,8 @@ accelerate launch generation_utils/train_custom_diffusion.py \
   --validation_prompt "a photo of a ${CONCEPT_NAME} ${CLASS_NAME//_/ }" \
                       "a photo of a ${CONCEPT_NAME} ${CLASS_NAME//_/ } at school" \
                       "a photo of a ${CONCEPT_NAME} ${CLASS_NAME//_/ } in bronze" \
+                      "a photo of a ${CONCEPT_NAME} ${CLASS_NAME//_/ } with the Tower of Pisa in the background" \
+                      "a photo of a green ${CONCEPT_NAME} ${CLASS_NAME//_/ }" \
   --no_safe_serialization \
   --checkpointing_steps 50 \
   --validation_steps 50 \

@@ -32,4 +32,6 @@ accelerate launch generation_utils/train_dreambooth.py \
   --validation_prompt "a photo of a ${CONCEPT_NAME} ${CLASS_NAME//_/ }" \
                       "a photo of a ${CONCEPT_NAME} ${CLASS_NAME//_/ } at school" \
                       "a photo of a ${CONCEPT_NAME} ${CLASS_NAME//_/ } in bronze" \
+                      "a photo of a ${CONCEPT_NAME} ${CLASS_NAME//_/ } with the Tower of Pisa in the background" \
+                      "a photo of a green ${CONCEPT_NAME} ${CLASS_NAME//_/ }" \
   --num_validation_images 3

@@ -29,6 +29,9 @@ accelerate launch generation_utils/train_textual_inversion.py \
   --save_steps 1000 \
   --validation_steps 1000 \
   --no_safe_serialization \
+  --num_validation_images 3 \
   --validation_prompt "a photo of a ${CONCEPT_NAME}" \
                       "a photo of a ${CONCEPT_NAME} at school" \
-                      "a photo of a ${CONCEPT_NAME} in bronze"
+                      "a photo of a ${CONCEPT_NAME} in bronze" \
+                      "a photo of a ${CONCEPT_NAME} with the Tower of Pisa in the background" \
+                      "a photo of a green ${CONCEPT_NAME}"
