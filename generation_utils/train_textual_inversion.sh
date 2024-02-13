@@ -26,8 +26,8 @@ accelerate launch generation_utils/train_textual_inversion.py \
   --report_to wandb \
   --seed=42 \
   --checkpointing_steps 10000000 \
-  --save_steps 1000 \
-  --validation_steps 1000 \
+  --save_steps 500 \
+  --validation_steps 500 \
   --no_safe_serialization \
   --num_validation_images 3 \
   --validation_prompt "a photo of a ${CONCEPT_NAME}" \
