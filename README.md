@@ -52,4 +52,4 @@ sbatch generation_utils/inference.sbatch htazawa dog creature checkpoints/custom
 # make sure that <t1> is token you need
 sbatch generation_utils/inference2.sbatch "<t1>" '_' object ../Unsupervised-Compositional-Concepts-Discovery/can-2tokens/checkpoint-1700/ generated/concept_discovery/can/sd2.1
 ```
-Note: you probably want to use [this](https://github.com/AIshutin/subject-driven-gen-eval) to train it.
+Note: you probably want to use [this](https://github.com/AIshutin/Unsupervised-Compositional-Concepts-Discovery) to train it.

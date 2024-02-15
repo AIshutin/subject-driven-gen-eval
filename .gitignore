@@ -13,6 +13,7 @@ comparison_results
 img-table.jpg
 img-table.html
 evaluation_results/
+sanity_check
 
 # C extensions
 *.so
