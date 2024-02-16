@@ -9,6 +9,7 @@ import clip
 from torchvision import transforms
 from torch.nn import functional as F
 from transformers import ViTModel
+import sys
 # DINO code was taken from https://github.com/google/dreambooth/issues/3
 
 
@@ -66,28 +67,25 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser("Evaluatation script for subject-driven text2image methods")
     parser.add_argument("--realimages", type=Path, help="Dir with real images")
     parser.add_argument("--prompts", type=Path, help="JSON file with prompts and corresponding image names")
-    parser.add_argument("--descriptor", type=str, default=None, required=False, 
-                        help="Descriptor name. If specified, this descriptor will be removed from prompts")
     parser.add_argument("--silent", "--jsononly", action="store_true")
     args = parser.parse_args()
     base_path = args.prompts.parent
-
-    
-    def fix_prompt(prompt):
-        if args.descriptor is not None:
-            return prompt.replace(args.descriptor, "")
-        return prompt
-
 
     metrics = {}
 
     with open(args.prompts) as file:
         dataset = json.load(file)
     
+    descriptor = dataset.get('descriptor', '')
+    class_name = dataset['class']
+
     text_similarity = Mean()
     with torch.no_grad():
-        for prompt, imgs in tqdm(dataset['prompted'].items(), desc="CLIP-T", disable=args.silent):
-            text_features = get_clip_text_feats_norm(fix_prompt(prompt))
+        for jdict in tqdm(dataset['prompted'], desc="CLIP-T", disable=args.silent):
+            prompt = jdict['original_prompt']
+            imgs = jdict['images']
+            print(prompt, file=sys.stderr)
+            text_features = get_clip_text_feats_norm(prompt)
             for img in imgs:
                 image_features = get_clip_image_feats_norm(base_path / img)
                 text_similarity.add(((text_features * image_features).sum() ).item())
@@ -132,4 +130,3 @@ if __name__ == "__main__":
         print(f"DINO: {metrics['DINO']:.3f}")
     else:
         print(json.dumps(metrics))
-

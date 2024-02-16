@@ -1,5 +1,0 @@
-python3 evaluate.py --realimages datasets/dreambooth/dog --prompts generated/dreambooth/dog/sd2.1-step1000/description.json --descriptor hazawa --silent >evaluation_results/dreambooth-1000step-eval.json
-python3 evaluate.py --realimages datasets/dreambooth/fancy_boot --prompts generated/dreambooth/fancy_boot/sd2.1-step1000/description.json --descriptor hazawa --silent >>evaluation_results/dreambooth-1000step-eval.json
-python3 evaluate.py --realimages datasets/dreambooth/backpack_dog --prompts generated/dreambooth/backpack_dog/sd2.1-step1000/description.json --descriptor hazawa --silent >>evaluation_results/dreambooth-1000step-eval.json
-python3 evaluate.py --realimages datasets/dreambooth/can --prompts generated/dreambooth/can/sd2.1-step1000/description.json --descriptor hazawa --silent >>evaluation_results/dreambooth-1000step-eval.json
-python3 evaluate.py --realimages datasets/dreambooth/berry_bowl --prompts generated/dreambooth/berry_bowl/sd2.1-step1000/description.json --descriptor hazawa --silent >>evaluation_results/dreambooth-1000step-eval.json

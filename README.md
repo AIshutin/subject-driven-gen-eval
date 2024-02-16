@@ -11,9 +11,11 @@ conda activate diffusers
 conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
 pip install -r requiremens.txt
 pip install -r script_requirements.txt
-```
 
-You might also need `wkhtmltopdf` in case you want to make comparison jpg
+# Only if you want to use Dreambooth dataset 
+cd datasets && git clone https://github.com/google/dreambooth && mv dreambooth/dataset/* . && cd ..
+python3 generate_description.py --dataset datasets/dreambooth
+```
 
 ### Examples
 
@@ -44,7 +46,7 @@ sbatch generation_utils/inference.sbatch htazawa dog creature checkpoints/dreamb
 ```bash
 sbatch generation_utils/train_custom_diffusion.sbatch dog dog
 # ... manually select checkpoint according to evaluation
-sbatch generation_utils/inference.sbatch htazawa dog creature checkpoints/custom_diffusion/dog/sd2.1/ generated/custom_diffusion/dog/sd2.1
+sbatch generation_utils/inference.sbatch "<htazawa>" dog creature checkpoints/custom_diffusion/dog/sd2.1/ generated/custom_diffusion/dog/sd2.1
 ```
 
 **Use trained Unsupervised-Concept-Discovery model, slurm**
