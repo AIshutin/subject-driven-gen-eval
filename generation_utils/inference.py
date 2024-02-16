@@ -17,55 +17,82 @@ def main(pipeline, device, args):
     image_dir = args.output_dir
     image_dir.mkdir(parents=True, exist_ok=True)
     description = {
-        "prompted": {},
+        "prompted": [],
         "normal": [],
         "descriptor": args.descriptor_name,
         "class": args.class_name
     }
 
     generator = None if args.seed is None else torch.Generator(device=device).manual_seed(args.seed)
-    prompt_image_rows = []
-    normal_images = []
 
-    validation_prompts = []
     with open(args.prompts) as file:
-        validation_prompts = json.load(file)
-    validation_prompts = [el.format(args.descriptor_name, args.class_name) 
-                            for el in validation_prompts]
+        raw_validation_prompts = json.load(file)
 
-    for prompt in tqdm(validation_prompts, desc="generating images with advanced prompts"):
-        prompt_image_rows.append([prompt])
-        while len(prompt_image_rows[-1]) - 1 < args.num_prompted_images:
-            cnt_images = min(args.num_prompted_images + 1 - len(prompt_image_rows[-1]),
+    image_cnt = 1
+    for prompt in tqdm(raw_validation_prompts, desc="generating images with advanced prompts"):
+        original_prompt = prompt.format("", args.class_name).replace("  ", " ")
+
+        if args.no_article and prompt.startswith('a '):
+            prompt = prompt[2:]
+
+        if args.add_class_name:
+            prompt = prompt.format(args.descriptor_name, args.class_name)
+        else:
+            prompt = prompt.format(args.descriptor_name, "").replace("  ", " ")
+        
+        original_prompt = 'a photo of ' + original_prompt
+        prompt = 'a photo of ' + prompt
+
+        all_images = []
+        while len(all_images) < args.num_prompted_images:
+            cnt_images = min(args.num_prompted_images - len(all_images),
                              args.sample_batch_size)
-            images = pipeline(prompt="a photo of " + prompt, num_inference_steps=args.num_inference_steps, 
+
+            images = pipeline(prompt=prompt, num_inference_steps=args.num_inference_steps, 
                               generator=generator, num_images_per_prompt=cnt_images,
                               verbose=False, eta=args.eta,
                               scale_guidance=args.scale_guidance).images
-            prompt_image_rows[-1].extend(images)
+        
+            all_images.extend(images)
+        
+        image_paths = []
+        for image in all_images:
+            image.save(image_dir / f"{image_cnt}.jpg")
+            image_paths.append(f"{image_cnt}.jpg")
+            image_cnt += 1
+        
+        description["prompted"].append(
+            {
+                "generation_prompt": prompt,
+                "original_prompt": original_prompt,
+                "images": image_paths
+            }
+        )
+
+    baseprompt = "a photo of "
+    if not args.no_article:
+        baseprompt = baseprompt + "a "
+    if args.add_class_name:
+        baseprompt = baseprompt + f"{args.descriptor_name} {args.class_name}"
+    else:
+        baseprompt = baseprompt + f"{args.descriptor_name}"
+    description["baseprompt"] = baseprompt
 
     for _ in tqdm(range((args.num_baseline_images - 1) // args.sample_batch_size + 1), 
                     desc="generating images with base prompt"):
-        images = pipeline(prompt=f"a photo of a {args.descriptor_name} {args.class_name}",
+        images = pipeline(prompt=baseprompt,
                           num_inference_steps=args.num_inference_steps,
                           generator=generator,
                           num_images_per_prompt=args.sample_batch_size,
                           scale_guidance=args.scale_guidance).images
+        image_paths = []
+        for image in images:
+            path = f"{image_cnt}.jpg"
+            image.save(image_dir / path)
+            image_paths.append(path)
+            image_cnt += 1
         
-        normal_images.extend(images)
-    
-    cnt = 0
-    for el in prompt_image_rows:
-        description['prompted'][el[0]] = []
-        for img in el[1:]:
-            cnt += 1
-            img.save(image_dir / f"{cnt}.jpg")
-            description['prompted'][el[0]].append(f"{cnt}.jpg")
-
-    for img in normal_images:
-        cnt += 1
-        img.save(image_dir / f"{cnt}.jpg")
-        description["normal"].append(f"{cnt}.jpg")
+        description["normal"].extend(image_paths)
 
     with open(image_dir / 'description.json', 'w') as file:
         json.dump(description, file, indent=4)
@@ -98,7 +125,18 @@ if __name__ == "__main__":
     parser.add_argument(
         "--class_name",
         type=str,
+        required=True,
         help="Class name for use in validation prompt templates"
+    )
+    parser.add_argument(
+        "--add_class_name",
+        action='store_true',
+        help="Add class name to prompts"
+    )
+    parser.add_argument(
+        "--no_article",
+        action='store_true',
+        help="Do not article (a) to prompts"
     )
     parser.add_argument(
         "--num_baseline_images",
@@ -143,13 +181,13 @@ if __name__ == "__main__":
         default=0.0
     )
     args = parser.parse_args()
-    if args.class_name == '_' or args.class_name == '-':
-        args.class_name = ''
+    print(args)
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     pipeline = DiffusionPipeline.from_pretrained(
-        args.pretrained_model_name_or_path
+        args.pretrained_model_name_or_path,
     )
+    pipeline.safety_checker = None
     pipeline.scheduler = DDPMScheduler.from_config(pipeline.scheduler.config)
 
 

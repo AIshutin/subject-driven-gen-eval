@@ -12,9 +12,10 @@ if __name__ == "__main__":
         if dir.is_file():
             continue
         images = [file for file in dir.iterdir() if file.suffix != 'json']
-        j = {"prompted": {}, 
+        j = {"prompted": [], 
              "normal": [dir.name + '/' + image.name for image in images], 
              "descriptor": "",
-             "class": dir.name}
+             "class": dir.name,
+             "baseprompt": "ground truth image"}
         with open(dir.parent / f'{dir.name}-description.json', 'w') as file:
             print(json.dumps(j), file=file)

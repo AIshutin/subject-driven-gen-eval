@@ -22,10 +22,5 @@ python -V
 conda list
 nvcc --version
 
-python3 generation_utils/inference.py \
-    --checkpoint $4 \
-    --prompts datasets/dreambooth/$3_prompts.json \
-    --class_name $2 \
-    --descriptor $1 \
-    --output_dir $5 \
-    --seed 42
+
+bash generation_utils/inference.py $1 $2 $3
