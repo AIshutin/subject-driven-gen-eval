@@ -1150,7 +1150,7 @@ def main(args):
                                 tracker.log(
                                     {
                                         "test": [
-                                            wandb.Image(image, caption=f"{i}: {args.validation_prompt}")
+                                            wandb.Image(image, caption=f"{i}: {args.validation_prompt[i % len(args.validation_prompt)]}")
                                             for i, image in enumerate(images)
                                         ]
                                     }

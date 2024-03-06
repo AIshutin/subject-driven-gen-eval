@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=dreambooth
-#SBATCH --error=run-logs/dreambooth-%j.err
-#SBATCH --output=run-logs/dreambooth-%j.log
+#SBATCH --job-name=mydisenbooth
+#SBATCH --error=run-logs/mydisenbooth-%j.err
+#SBATCH --output=run-logs/mydisenbooth-%j.log
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=5
 #SBATCH --time=3:00:00
