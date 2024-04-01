@@ -1,3 +1,7 @@
+import sys
+SYS_STOUD = sys.stdout
+sys.stdout = sys.stderr
+
 import argparse
 from pathlib import Path
 from PIL import Image
@@ -9,13 +13,17 @@ import clip
 from torchvision import transforms
 from torch.nn import functional as F
 from transformers import ViTModel
-import sys
+from collections import defaultdict
+import lpips
+
+
 # DINO code was taken from https://github.com/google/dreambooth/issues/3
 
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 clip_model, clip_preprocess = clip.load("ViT-B/32", device=device)
 dino = ViTModel.from_pretrained('facebook/dino-vits16').to(device)
+lpips_net = lpips.LPIPS(net='alex') # best forward scores
 
 
 # DINO Transforms
@@ -25,6 +33,13 @@ T = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
     ])
+
+T_lpips = transforms.Compose([
+    transforms.Resize(256, interpolation=3),
+    transforms.CenterCrop(256),
+    transforms.ToTensor(),
+    transforms.Lambda(lambda x: x.unsqueeze(0) * 2 - 1)
+])
 
 
 def get_clip_image_feats_norm(img_name):
@@ -79,99 +94,84 @@ if __name__ == "__main__":
     descriptor = dataset.get('descriptor', '')
     class_name = dataset['class']
 
-    text_similarity = Mean()
+    per_prompt = []
     with torch.no_grad():
-        for jdict in tqdm(dataset['prompted'], desc="CLIP-T", disable=args.silent):
+        clip_features_gt = []
+        dino_features_gt = []
+        for img in args.realimages.iterdir():
+            if not img.is_file():
+                continue
+            dino_features_gt.append(get_dino_image_feats_norm(img))     
+            clip_features_gt.append(get_clip_image_feats_norm(img))         
+        
+
+        for jdict in tqdm(dataset['prompted'], disable=args.silent):
             prompt = jdict['original_prompt']
             imgs = jdict['images']
-            print(prompt, file=sys.stderr)
-            text_features = get_clip_text_feats_norm(prompt)
-            for img in imgs:
-                image_features = get_clip_image_feats_norm(base_path / img)
-                text_similarity.add(((text_features * image_features).sum() ).item())
-    
-    metrics['CLIP-T'] = text_similarity.get()
-    if not args.silent:
-        print(f"CLIP-T: {metrics['CLIP-T']:.3f}")
+            text_features_gt = get_clip_text_feats_norm(prompt)
+            text_similarity = 0
+            clipi_similarity = 0
+            dino_similarity = 0
+            diversity = 0
+
+            cnt = 0
+            for i, img in enumerate(imgs):
+                clip_image_features = get_clip_image_feats_norm(base_path / img)
+                dino_image_features = get_dino_image_feats_norm(base_path / img)
+                text_similarity += (clip_image_features * text_features_gt).sum().item()
+                for feats in clip_features_gt:
+                    clipi_similarity += (feats * clip_image_features).sum().item()
+                for feats in dino_features_gt:
+                    dino_similarity += (feats * dino_image_features).sum().item()
+                for j, img2 in enumerate(imgs):
+                    if i <= j:
+                        continue
+                    cnt += 1
+                    diversity += lpips_net(T_lpips(Image.open(base_path / img)), 
+                                           T_lpips(Image.open(base_path / img2))).item()
+
+            diversity /= cnt
+            text_similarity /= len(imgs)
+            clipi_similarity /= len(imgs) * len(clip_features_gt)
+            dino_similarity /= len(imgs) * len(dino_features_gt)
+
+            per_prompt.append({
+                "CLIP-T": text_similarity,
+                "CLIP-I": clipi_similarity,
+                "DINO": dino_similarity,
+                "DIV": diversity,
+                "prompt": jdict['original_prompt'],
+            })
 
 
-    image_similarity = Mean()
-    with torch.no_grad():
-        original_features = []
-        for img in args.realimages.iterdir():
-            if not img.is_file():
-                continue
-            original_features.append(get_clip_image_feats_norm(img))        
+    metrics = {}
+    for key in 'CLIP-T', 'CLIP-I', 'DINO', 'DIV':
+        metrics[key] = 0
+        for prompt_dict in per_prompt:
+            metrics[key] += prompt_dict[key]
+        metrics[key] /= (1e-8 + len(per_prompt))
 
+    clipi_base_similarity = Mean()
+    dino_base_similarity = Mean()
+    with torch.no_grad():       
         for img in tqdm(dataset['normal'], desc="CLIP-I (base)", disable=args.silent):
             img_feats = get_clip_image_feats_norm(base_path / img)
-            for feats in original_features:
-                image_similarity.add((feats * img_feats).sum().item())
-    
-    metrics['CLIP-I (base)'] = image_similarity.get()
-    if not args.silent:
-        print(f"CLIP-I (base): {metrics['CLIP-I (base)']:.3f}")
-
-
-    image_similarity = Mean()
-    with torch.no_grad():
-        original_features = []
-        for img in args.realimages.iterdir():
-            if not img.is_file():
-                continue
-            original_features.append(get_clip_image_feats_norm(img))        
-
-        imgs = []
-        for jdict in dataset['prompted']:
-            imgs.extend(jdict['images'])
-        
-        for img in tqdm(imgs, desc="CLIP-I", disable=args.silent):
-            img_feats = get_clip_image_feats_norm(base_path / img)
-            for feats in original_features:
-                image_similarity.add((feats * img_feats).sum().item())
-    
-    metrics['CLIP-I'] = image_similarity.get()
-    if not args.silent:
-        print(f"CLIP-I: {metrics['CLIP-I']:.3f}")
-
-
-    dino_similarity = Mean()
-    with torch.no_grad():
-        original_features = []
-        for img in args.realimages.iterdir():
-            if not img.is_file():
-                continue
-            original_features.append(get_dino_image_feats_norm(img))        
-
-        for img in tqdm(dataset['normal'], desc="DINO (base)", disable=args.silent):
+            for feats in clip_features_gt:
+                clipi_base_similarity.add((feats * img_feats).sum().item())
             img_feats = get_dino_image_feats_norm(base_path / img)
-            for feats in original_features:
-                dino_similarity.add((feats * img_feats).sum().item())
-    
-    metrics['DINO (base)'] = dino_similarity.get()
+            for feats in dino_features_gt:
+                dino_base_similarity.add((feats * img_feats).sum().item())
+    metrics['CLIP-I (base)'] = clipi_base_similarity.get()
+    metrics['DINO (base)']   = dino_base_similarity.get()
+
+
     if not args.silent:
-        print(f"DINO (base): {metrics['DINO (base)']:.3f}")
-    
-
-    dino_similarity = Mean()
-    with torch.no_grad():
-        original_features = []
-        for img in args.realimages.iterdir():
-            if not img.is_file():
-                continue
-            original_features.append(get_dino_image_feats_norm(img))        
-
-        imgs = []
-        for jdict in dataset['prompted']:
-            imgs.extend(jdict['images'])
-
-        for img in tqdm(imgs, desc="DINO", disable=args.silent):
-            img_feats = get_dino_image_feats_norm(base_path / img)
-            for feats in original_features:
-                dino_similarity.add((feats * img_feats).sum().item())
-    
-    metrics['DINO'] = dino_similarity.get()
-    if not args.silent:
-        print(f"DINO: {metrics['DINO']:.3f}")
+        print(f"CLIP-T: {metrics['CLIP-T']:.3f}", file=SYS_STOUD)
+        print(f"CLIP-I: {metrics['CLIP-I']:.3f}", file=SYS_STOUD)
+        print(f"DINO: {metrics['DINO']:.3f}", file=SYS_STOUD)
+        print(f"CLIP-I (base): {metrics['CLIP-I (base)']:.3f}", file=SYS_STOUD)
+        print(f"DINO (base): {metrics['DINO (base)']:.3f}", file=SYS_STOUD)
+        print(f"DIV: {metrics['DIV']:.3f}", file=SYS_STOUD)
     else:
-        print(json.dumps(metrics))
+        metrics['per_prompt'] = per_prompt
+        print(json.dumps(metrics), file=SYS_STOUD)
