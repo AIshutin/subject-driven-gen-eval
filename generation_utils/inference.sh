@@ -33,6 +33,11 @@ then
     DESCRIPTOR=
     FLAGS="--add_class_name"
 fi
+if [ $1 = "mydisenbooth" -o $1 = "disenbooth" ]
+then
+    FLAGS="--no_photo_of --scale_guidance 7.0 --add_class_name"
+    DESCRIPTOR="--descriptor $4</w>"
+fi
 
 python3 generation_utils/inference.py \
     $CHECKPOINT \
@@ -40,5 +45,5 @@ python3 generation_utils/inference.py \
     --class_name $4 \
     $DESCRIPTOR \
     --output_dir generated/$1/$3/sd2.1/ \
-    --seed 42 $FLAGS 
+    --seed 42 $FLAGS \
 #        --num_prompted_images 1 --num_baseline_images 25

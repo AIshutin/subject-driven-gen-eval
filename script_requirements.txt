@@ -4,3 +4,4 @@ transformers>=4.25.1
 ftfy
 Jinja2
 open_clip_torch
+peft==0.7.0

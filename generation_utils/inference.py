@@ -29,6 +29,10 @@ def main(pipeline, device, args):
         raw_validation_prompts = json.load(file)
 
     image_cnt = 1
+    prefix_prompt = "a photo of "
+    if args.no_photo_of:
+        prefix_prompt = ""
+
     for prompt in tqdm(raw_validation_prompts, desc="generating images with advanced prompts"):
         original_prompt = prompt.format("", args.class_name).replace("  ", " ")
 
@@ -40,8 +44,8 @@ def main(pipeline, device, args):
         else:
             prompt = prompt.format(args.descriptor_name, "").replace("  ", " ")
         
-        original_prompt = 'a photo of ' + original_prompt
-        prompt = 'a photo of ' + prompt
+        original_prompt =  "a photo of " + original_prompt
+        prompt = prefix_prompt + prompt
 
         all_images = []
         while len(all_images) < args.num_prompted_images:
@@ -69,7 +73,7 @@ def main(pipeline, device, args):
             }
         )
 
-    baseprompt = "a photo of "
+    baseprompt = prefix_prompt
     if not args.no_article:
         baseprompt = baseprompt + "a "
     if args.add_class_name:
@@ -83,6 +87,7 @@ def main(pipeline, device, args):
         images = pipeline(prompt=baseprompt,
                           num_inference_steps=args.num_inference_steps,
                           generator=generator,
+                          eta=args.eta,
                           num_images_per_prompt=args.sample_batch_size,
                           scale_guidance=args.scale_guidance).images
         image_paths = []
@@ -132,6 +137,11 @@ if __name__ == "__main__":
         "--add_class_name",
         action='store_true',
         help="Add class name to prompts"
+    )
+    parser.add_argument(
+        "--no_photo_of",
+        action='store_true',
+        help="Do not add 'a photo of' to prompt"
     )
     parser.add_argument(
         "--no_article",
@@ -194,11 +204,8 @@ if __name__ == "__main__":
     if args.checkpoint:
         changed = False
         if (args.checkpoint / 'unet').exists():
+            print(args.checkpoint / 'unet', (args.checkpoint / 'unet').exists())
             pipeline.unet = UNet2DConditionModel.from_pretrained(args.checkpoint, subfolder="unet")
-            changed = True
-        if (args.checkpoint / 'text_encoder').exists():
-            cls = pipeline.text_encoder.__class__
-            pipeline.text_encoder = cls.from_pretrained(args.checkpoint, subfolder='text_encoder')            
             changed = True
         if (args.checkpoint / 'pytorch_custom_diffusion_weights.bin').exists():
             pipeline.unet.load_attn_procs(args.checkpoint, 
@@ -213,8 +220,12 @@ if __name__ == "__main__":
             pipeline.tokenizer = CLIPTokenizer.from_pretrained(args.checkpoint, subfolder="tokenizer")
             changed = True
         if (args.checkpoint / 'text_encoder').exists():
-            from transformers import CLIPTextModel
-            pipeline.text_encoder = CLIPTextModel.from_pretrained(args.checkpoint, subfolder="text_encoder")
+            cls = pipeline.text_encoder.__class__
+            pipeline.text_encoder = cls.from_pretrained(args.checkpoint, subfolder='text_encoder')            
+            changed = True
+        if (args.checkpoint / 'pytorch_lora_weights.safetensors').exists():
+            assert(not changed)
+            pipeline.load_lora_weights(args.checkpoint)
             changed = True
         assert(changed)
  

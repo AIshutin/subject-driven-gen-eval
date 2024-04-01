@@ -1,4 +1,4 @@
-declare -a concepts=("dog" "can")
+declare -a concepts=("dog" "can" "backpack_dog" )
 
 for i in "${concepts[@]}"
 do

@@ -103,7 +103,29 @@ if __name__ == "__main__":
                 continue
             original_features.append(get_clip_image_feats_norm(img))        
 
-        for img in tqdm(dataset['normal'], desc="CLIP-I", disable=args.silent):
+        for img in tqdm(dataset['normal'], desc="CLIP-I (base)", disable=args.silent):
+            img_feats = get_clip_image_feats_norm(base_path / img)
+            for feats in original_features:
+                image_similarity.add((feats * img_feats).sum().item())
+    
+    metrics['CLIP-I (base)'] = image_similarity.get()
+    if not args.silent:
+        print(f"CLIP-I (base): {metrics['CLIP-I (base)']:.3f}")
+
+
+    image_similarity = Mean()
+    with torch.no_grad():
+        original_features = []
+        for img in args.realimages.iterdir():
+            if not img.is_file():
+                continue
+            original_features.append(get_clip_image_feats_norm(img))        
+
+        imgs = []
+        for jdict in dataset['prompted']:
+            imgs.extend(jdict['images'])
+        
+        for img in tqdm(imgs, desc="CLIP-I", disable=args.silent):
             img_feats = get_clip_image_feats_norm(base_path / img)
             for feats in original_features:
                 image_similarity.add((feats * img_feats).sum().item())
@@ -111,6 +133,7 @@ if __name__ == "__main__":
     metrics['CLIP-I'] = image_similarity.get()
     if not args.silent:
         print(f"CLIP-I: {metrics['CLIP-I']:.3f}")
+
 
     dino_similarity = Mean()
     with torch.no_grad():
@@ -120,7 +143,29 @@ if __name__ == "__main__":
                 continue
             original_features.append(get_dino_image_feats_norm(img))        
 
-        for img in tqdm(dataset['normal'], desc="DINO", disable=args.silent):
+        for img in tqdm(dataset['normal'], desc="DINO (base)", disable=args.silent):
+            img_feats = get_dino_image_feats_norm(base_path / img)
+            for feats in original_features:
+                dino_similarity.add((feats * img_feats).sum().item())
+    
+    metrics['DINO (base)'] = dino_similarity.get()
+    if not args.silent:
+        print(f"DINO (base): {metrics['DINO (base)']:.3f}")
+    
+
+    dino_similarity = Mean()
+    with torch.no_grad():
+        original_features = []
+        for img in args.realimages.iterdir():
+            if not img.is_file():
+                continue
+            original_features.append(get_dino_image_feats_norm(img))        
+
+        imgs = []
+        for jdict in dataset['prompted']:
+            imgs.extend(jdict['images'])
+
+        for img in tqdm(imgs, desc="DINO", disable=args.silent):
             img_feats = get_dino_image_feats_norm(base_path / img)
             for feats in original_features:
                 dino_similarity.add((feats * img_feats).sum().item())
