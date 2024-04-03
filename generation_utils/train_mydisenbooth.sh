@@ -4,7 +4,7 @@ export CONCEPT_NAME="$2</w>" # like in original code.
 export CLASS_NAME=$2
 export MODEL_NAME="stabilityai/stable-diffusion-2-1-base"
 export INSTANCE_DIR="datasets/dreambooth/${SUBJECT_NAME}"
-export OUTPUT_DIR="checkpoints/mydisenbooth/${SUBJECT_NAME}/sd2.1"
+export OUTPUT_DIR="checkpoints/mydisenbooth-debug/${SUBJECT_NAME}/sd2.1"
 export WANDB_NAME="mydisenbooth-sd2.1-${SUBJECT_NAME}-${CLASS_NAME}"
 
 accelerate launch generation_utils/train_mydisenbooth.py \
@@ -27,6 +27,6 @@ accelerate launch generation_utils/train_mydisenbooth.py \
   --num_validation_images 3 \
   --validation_prompt "a ${CONCEPT_NAME} ${CLASS_NAME//_/ }" \
                       "a ${CONCEPT_NAME} ${CLASS_NAME//_/ } at school classroom" \
-                      "a bronze statue of ${CONCEPT_NAME} ${CLASS_NAME//_/ }" \
+                      "a bronze statue of a ${CONCEPT_NAME} ${CLASS_NAME//_/ }" \
                       "a ${CONCEPT_NAME} ${CLASS_NAME//_/ } with the Tower of Pisa in the background" \
                       "a green ${CONCEPT_NAME} ${CLASS_NAME//_/ }" \
