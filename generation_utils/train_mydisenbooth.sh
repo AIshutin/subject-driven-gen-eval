@@ -4,7 +4,7 @@ export CONCEPT_NAME="$2</w>" # like in original code.
 export CLASS_NAME=$2
 export MODEL_NAME="stabilityai/stable-diffusion-2-1-base"
 export INSTANCE_DIR="datasets/dreambooth/${SUBJECT_NAME}"
-export OUTPUT_DIR="checkpoints/mydisenbooth-debug/${SUBJECT_NAME}/sd2.1"
+export OUTPUT_DIR="checkpoints/mydisenbooth/${SUBJECT_NAME}/sd2.1"
 export WANDB_NAME="mydisenbooth-sd2.1-${SUBJECT_NAME}-${CLASS_NAME}"
 
 accelerate launch generation_utils/train_mydisenbooth.py \
