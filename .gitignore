@@ -15,6 +15,7 @@ img-table.html
 evaluation_results/
 sanity_check
 images/
+evaluation_results-seeds/
 
 # C extensions
 *.so

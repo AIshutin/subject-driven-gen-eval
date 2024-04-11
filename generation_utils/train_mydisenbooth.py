@@ -677,9 +677,9 @@ class DisenBoothDataset(Dataset):
 def collate_fn(examples, ie_processing=None, with_prior_preservation=False,):
     has_attention_mask = "instance_attention_mask" in examples[0]
     
-    #subject_images4ie = [ie_processing(example['original_subject_images']).unsqueeze(0) \
-    #                     for example in examples]
-    #subject_images4ie = torch.cat(subject_images4ie, dim=0)
+    subject_images4ie = [ie_processing(example['original_subject_images']).unsqueeze(0) \
+                         for example in examples]
+    subject_images4ie = torch.cat(subject_images4ie, dim=0)
     input_ids = [example["instance_prompt_ids"] for example in examples]
     pixel_values = [example["instance_images"] for example in examples]
 
@@ -702,7 +702,7 @@ def collate_fn(examples, ie_processing=None, with_prior_preservation=False,):
     batch = {
         "input_ids": input_ids,
         "pixel_values": pixel_values,
-        "subject_images4ie": ie_processing(pixel_values),
+        "subject_images4ie": subject_images4ie,
     }
 
     if has_attention_mask:
@@ -907,7 +907,6 @@ def main(args):
 
     image_encoder, _, preprocess4image_encoder = open_clip.create_model_and_transforms(args.image_encoder_type, 
                                                             pretrained=args.image_encoder_version)
-    print(preprocess4image_encoder, 'preprocess4image_encoder')
 
     try:
         vae = AutoencoderKL.from_pretrained(
@@ -1170,8 +1169,7 @@ def main(args):
         train_dataset,
         batch_size=args.train_batch_size,
         shuffle=True,
-        # as in official implementation                  VVVV
-        collate_fn=lambda examples: collate_fn(examples, transforms.Resize( (224, 224), interpolation=transforms.InterpolationMode.BILINEAR), 
+        collate_fn=lambda examples: collate_fn(examples, preprocess4image_encoder, \
                                                args.with_prior_preservation),
         num_workers=args.dataloader_num_workers,
     )
@@ -1367,7 +1365,7 @@ def main(args):
                 weak_loss = F.mse_loss(model_pred_wo_visual.float(), target.float(), reduction="mean")
                 subject_embeddings = subject_embeddings.mean(1)
                 assert(subject_embeddings.shape == visual_embeddings.shape)
-                contrasive_loss = F.cosine_similarity(subject_embeddings, visual_embeddings, eps=1e-6).mean()
+                contrasive_loss = F.cosine_similarity(subject_embeddings, visual_embeddings).mean()
                 loss = main_loss + args.weak_loss_weight * weak_loss +\
                        args.contrasive_loss_weight * contrasive_loss
 

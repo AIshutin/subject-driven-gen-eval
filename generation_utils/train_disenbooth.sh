@@ -22,9 +22,8 @@ accelerate launch generation_utils/train_disenbooth.py \
   --lr_warmup_steps=0 \
   --max_train_steps=3000 \
   --validation_epochs=200 \
-  --seed="0" \
-  --report_to wandb \
   --seed=42 \
+  --report_to wandb \
   --validation_prompt "a ${CONCEPT_NAME} ${CLASS_NAME//_/ }" \
                       "a ${CONCEPT_NAME} ${CLASS_NAME//_/ } at school" \
                       "a ${CONCEPT_NAME} ${CLASS_NAME//_/ } in bronze" \
