@@ -7,7 +7,7 @@ then
     PROMPTS=datasets/dreambooth/creature_prompts.json
 fi
 
-if [ $1 = "dreambooth" ]
+if [ $1 = "dreambooth" -o $1 = "dreambooth_lora" ]
 then
     FLAGS="--add_class_name"
 fi
