@@ -1,4 +1,4 @@
-export WANDB_MODE="online"
+export WANDB_MODE="offline"
 export SUBJECT_NAME=$1
 export CONCEPT_NAME="htazawa" # sts is bad one, since it's a rifle
 export CLASS_NAME=$2
@@ -19,7 +19,7 @@ accelerate launch generation_utils/train_dreambooth_lora.py \
   --resolution=512 \
   --train_batch_size=1 \
   --gradient_accumulation_steps=1 \
-  --learning_rate=5e-6 \
+  --learning_rate=1e-4 \
   --lr_scheduler="constant" \
   --lr_warmup_steps=0 \
   --num_class_images=1000 \
