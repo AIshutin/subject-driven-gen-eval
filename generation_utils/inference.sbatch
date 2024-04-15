@@ -23,4 +23,4 @@ conda list
 nvcc --version
 
 
-bash generation_utils/inference.py $1 $2 $3
+bash generation_utils/inference.py $1 $2 $3 $4
