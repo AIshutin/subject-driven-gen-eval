@@ -25,8 +25,8 @@ accelerate launch generation_utils/train_disenbooth.py \
   --seed=42 \
   --report_to wandb \
   --validation_prompt "a ${CONCEPT_NAME} ${CLASS_NAME//_/ }" \
-                      "a ${CONCEPT_NAME} ${CLASS_NAME//_/ } at school" \
-                      "a ${CONCEPT_NAME} ${CLASS_NAME//_/ } in bronze" \
+                      "a ${CONCEPT_NAME} ${CLASS_NAME//_/ } in a school classroom" \
+                      "a bronze statue of a ${CONCEPT_NAME} ${CLASS_NAME//_/ }" \
                       "a ${CONCEPT_NAME} ${CLASS_NAME//_/ } with the Tower of Pisa in the background" \
                       "a green ${CONCEPT_NAME} ${CLASS_NAME//_/ }" \
   --num_validation_images 3 \

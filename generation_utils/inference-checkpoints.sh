@@ -32,7 +32,7 @@ then
     DESCRIPTOR=
     FLAGS="--add_class_name"
 fi
-if [ $1 = "mydisenbooth" -o $1 = "disenbooth" ]
+if [ $1 = "mydisenbooth" -o $1 = "disenbooth" -o $1 = "disenbooth_c_abs" -o $1 = "disenbooth_c_sqr" ]
 then
     FLAGS="--no_photo_of --scale_guidance 7.0 --add_class_name"
     DESCRIPTOR="--descriptor $4</w>"

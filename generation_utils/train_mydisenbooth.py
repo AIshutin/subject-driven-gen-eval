@@ -773,9 +773,9 @@ class DisenBoothAdapter(nn.Module):
             nn.Linear(n_feats, n_feats),
         )
 
-    def forward(self, X):
-
-        X = X * F.sigmoid(self.mask.unsqueeze(0))
+    def forward(self, X, do_mask=True):
+        if do_mask:
+            X = X * F.sigmoid(self.mask.unsqueeze(0))
         return X + self.mlp(X)
 
 

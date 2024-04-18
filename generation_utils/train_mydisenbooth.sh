@@ -26,7 +26,7 @@ accelerate launch generation_utils/train_mydisenbooth.py \
   --validation_steps 200 \
   --num_validation_images 3 \
   --validation_prompt "a ${CONCEPT_NAME} ${CLASS_NAME//_/ }" \
-                      "a ${CONCEPT_NAME} ${CLASS_NAME//_/ } at school classroom" \
+                      "a ${CONCEPT_NAME} ${CLASS_NAME//_/ } in a school classroom" \
                       "a bronze statue of a ${CONCEPT_NAME} ${CLASS_NAME//_/ }" \
                       "a ${CONCEPT_NAME} ${CLASS_NAME//_/ } with the Tower of Pisa in the background" \
                       "a green ${CONCEPT_NAME} ${CLASS_NAME//_/ }" \
