@@ -13,6 +13,7 @@ import numpy as np
 from diffusers import StableDiffusionInpaintPipeline
 import os
 from pathlib import Path
+from tqdm.auto import tqdm
 
 
 def show_anns(anns):
@@ -73,7 +74,6 @@ class InpaintingFixer:
 
     def set_concept(self, concept):
         ref_embeds = []
-        concept = 'backpack_dog'
         path = os.path.join(self.dataset_path, concept)
         for file in os.listdir(path):
             if '.jpg' in file or '.png' in file:
@@ -125,18 +125,18 @@ if __name__ == "__main__":
         description = json.load(file)
     args.outdir.mkdir(parents=True, exist_ok=True)
     
-    for el in description['prompted']:
+    for el in tqdm(description['prompted'], desc="prompted"):
         for image in el['images']:
             image_path = args.images / image
             fixed_dict = fixer.fix_image(image_path, el['original_prompt'])
             fixed_dict['cutout'].save(args.outdir / ('cutout_' + image))
             fixed_dict['image'].save(args.outdir / image)
 
-    for image in description['normal']:
+    for image in tqdm(description['normal'], desc="base images"):
         image_path = args.images / image
         fixed_dict = fixer.fix_image(image_path, f"a photo of a {description['class']}")
         fixed_dict['cutout'].save(args.outdir / ('cutout_' + image))
         fixed_dict['image'].save(args.outdir / image)
 
-    with open(args.outdir / 'description.json') as file:
-        json.dump(description, file=file)
+    with open(args.outdir / 'description.json', 'w') as file:
+        json.dump(description, file)
