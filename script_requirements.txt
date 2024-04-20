@@ -5,3 +5,4 @@ ftfy
 Jinja2
 open_clip_torch
 peft==0.7.0
+matplotlib

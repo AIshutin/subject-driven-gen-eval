@@ -3,3 +3,6 @@ git+https://github.com/openai/CLIP.git
 tqdm
 pandas
 git+https://github.com/S-aiueo32/lpips-pytorch.git
+git+https://github.com/facebookresearch/segment-anything
+opencv-python
+matplotlib
