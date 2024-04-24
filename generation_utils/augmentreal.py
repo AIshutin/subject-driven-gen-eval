@@ -154,14 +154,20 @@ class InpaintingAugmentator:
         image = self.inpipe(prompt=prompt, 
                             image=new_image, 
                             mask_image=anti_mask).images[0]
-        return image
+        return image, new_mask
 
-    def validate_image(self, image): # add CLIP-T score later0
+    def validate_image(self, image, old_mask, binarization_thr=0.5, inclusion_thr=0.95):
+        # images with values below 0.88 are garbage 
         mask_dict = self.get_mask(np.array(image))
-        mask = mask_dict['mask']
-        cutout = mask_dict['cutout']
-        score = mask_dict['score']
-        return score
+        new_mask = mask_dict['mask']
+        # cutout = mask_dict['cutout']
+        old_mask = np.array(old_mask) > binarization_thr
+        in_both = (old_mask & new_mask).astype(int).sum()
+        first_mask = old_mask.astype(int).sum()
+        second_mask = new_mask.astype(int).sum()
+        if in_both / first_mask < inclusion_thr:
+            return -100 # incorrect mask
+        return in_both / (second_mask + first_mask) * 2
 
 
 if __name__ == "__main__":
@@ -172,11 +178,12 @@ if __name__ == "__main__":
     parser.add_argument("--concept_name", required=True)
     parser.add_argument("--scale_factor", type=float, default=0.15)
     parser.add_argument("--shift_factor", type=float, default=0.15)
-    parser.add_argument("--out_suffix", default="_realaug",)
-    parser.add_argument("--N", type=int, default=110)
+    parser.add_argument("--out_suffix", default="_realaug2",)
+    parser.add_argument("--N", type=int, default=100)
     parser.add_argument("--prompts", type=Path,
                         default=Path("datasets/background_prompts.json"))
     parser.add_argument("--score_thr", type=float, default=0.3)
+    parser.add_argument("--iou_score", type=float, default=0.97)
     args = parser.parse_args()
     inpainter = InpaintingAugmentator()
     path = Path(inpainter.dataset_path) / args.concept
@@ -204,21 +211,29 @@ if __name__ == "__main__":
     opath = Path(inpainter.dataset_path) / (args.concept + args.out_suffix)
     opath.mkdir(parents=True, exist_ok=True)
     description = []
-
-    for i in tqdm(range(args.N)):
-        i_img = random.randint(0, len(source_images) - 1)
-        i_prompt = random.randint(0, len(prompts) - 1)
-        info = {
-            "image": f"{i + 1}.jpg",
-            "source": str(source_images[i_img].name),
-            "prompt": prompts[i_prompt]
-        }
-
-        prompt = random.choice(prompts)
-        mask, cutout = random.choice(source_data)
-        augmented = inpainter.augment_image(cutout, mask, prompt)
-        augmented.save(opath / info['image'])
-        description.append(info)
+    
+    images_cnt = 0
+    with tqdm(total=args.N, desc="Generating...", unit="image") as myprogressbar:
+        while args.N != images_cnt:
+            i_img = random.randint(0, len(source_images) - 1)
+            i_prompt = random.randint(0, len(prompts) - 1)
+            info = {
+                "image": f"{images_cnt + 1}.jpg",
+                "source": str(source_images[i_img].name),
+                "prompt": prompts[i_prompt]
+            }
+            prompt = random.choice(prompts)
+            mask, cutout = random.choice(source_data)
+            augmented, aug_mask = inpainter.augment_image(cutout, mask, prompt)
+            score = inpainter.validate_image(augmented, aug_mask)
+            if score < args.iou_score:
+                print('skipped')
+                continue
+            info['score'] = score
+            myprogressbar.update()
+            images_cnt += 1
+            augmented.save(opath / info['image'])
+            description.append(info)
     
     description_path = opath.parent / f"{args.concept}{args.out_suffix}_desc.json"
     with open(description_path, 'w') as file:
