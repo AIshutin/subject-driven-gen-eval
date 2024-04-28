@@ -84,16 +84,15 @@ def main(pipeline, image_adapter, device, args):
         prefix_prompt = ""
 
     if args.add_clip_reference is not None:
-        clip = CLIPVisionModel.from_pretrained("laion/CLIP-ViT-H-14-laion2B-s32B-b79K")
-        image_refs = [clip_transforms(Image.open(args.add_clip_reference / el)).to(device) \
+        clip = CLIPVisionModel.from_pretrained("laion/CLIP-ViT-H-14-laion2B-s32B-b79K").to(device)
+        image_refs = [clip_transforms(Image.open(args.add_clip_reference / el)).to(device).unsqueeze(0) \
                       for el in sorted(os.listdir(args.add_clip_reference))]
-        assert(len(image_refs.shape) == 4)
         image_refs = torch.cat(image_refs, dim=0)
         img_states = clip(image_refs, output_hidden_states=True)
         del clip
 
         img_states = [img_states.hidden_states[i][:, :1, :] for i in (24, 4, 8, 12, 16)]
-        img_states = image_adapter(img_states)
+        img_states = [torch.cat(image_adapter(img_state), dim=0).unsqueeze(0) for img_state in img_states]
 
 
     for prompt in tqdm(raw_validation_prompts, desc="generating images with advanced prompts"):
@@ -118,6 +117,7 @@ def main(pipeline, image_adapter, device, args):
             kwargs = dict(prompt=prompt, num_images_per_prompt=cnt_images)
             if args.add_clip_reference is not None:
                 curr_refs = random.sample(img_states, cnt_images)
+                curr_refs = torch.cat(curr_refs, dim=0)
                 kwargs = dict(prompt_embeds=encode_prompt_clip(pipeline, prompt, 
                                         curr_refs, concept=args.class_name),
                               )
@@ -157,6 +157,7 @@ def main(pipeline, image_adapter, device, args):
         kwargs = dict(prompt=baseprompt, num_images_per_prompt=args.sample_batch_size)
         if args.add_clip_reference is not None:
             curr_refs = random.sample(img_states, cnt_images)
+            curr_refs = torch.cat(curr_refs, dim=0)
             kwargs = dict(prompt_embeds=encode_prompt_clip(pipeline, baseprompt, 
                                     curr_refs, concept=args.class_name),
                             )

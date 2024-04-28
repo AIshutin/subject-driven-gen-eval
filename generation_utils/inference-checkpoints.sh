@@ -37,7 +37,7 @@ then
     FLAGS="--no_photo_of --scale_guidance 7.0 --add_class_name"
     DESCRIPTOR="--descriptor $4</w>"
 fi
-if [ $1 = "disenbooth_clip" ]
+if [ $1 = "disenbooth-clip" ]
 then
     FLAGS="--no_photo_of --scale_guidance 7.0 --add_class_name --add_clip_reference datasets/dreambooth/$3 "
     DESCRIPTOR="--descriptor $4</w>"
