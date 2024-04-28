@@ -31,11 +31,16 @@ if [ $1 = "baseline" ]
 then
     CHECKPOINT= 
     DESCRIPTOR=
-    FLAGS="--add_class_name"
+    FLAGS="--add_class_name "
 fi
-if [ $1 = "mydisenbooth" -o $1 = "disenbooth" -o $1 = "disenbooth_c_abs" -o $1 = "disenbooth_c_sqr" ]
+if [ $1 = "mydisenbooth" -o $1 = "disenbooth" -o $1 = "disenbooth_c_abs" -o $1 = "disenbooth_c_sqr" -o $1 = "disenbooth-noconcept" ]
 then
-    FLAGS="--no_photo_of --scale_guidance 7.0 --add_class_name"
+    FLAGS="--no_photo_of --scale_guidance 7.0 --add_class_name "
+    DESCRIPTOR="--descriptor $4</w>"
+fi
+if [ $1 = "disenbooth_clip" ]
+then
+    FLAGS="--no_photo_of --scale_guidance 7.0 --add_class_name --add_clip_reference datasets/dreambooth/$3 "
     DESCRIPTOR="--descriptor $4</w>"
 fi
 

@@ -11,9 +11,59 @@ import torch
 from pathlib import Path
 from tqdm.auto import tqdm
 import json
+from torch import nn
+import random
+import os
+from PIL import Image
+from torchvision import transforms
+from transformers import CLIPVisionModel
 
 
-def main(pipeline, device, args):
+clip_transforms = transforms.Compose([
+		        transforms.Resize( (224, 224), interpolation=transforms.InterpolationMode.BILINEAR ),
+                transforms.CenterCrop(224),
+                transforms.ToTensor(),
+                transforms.Normalize([0.5], [0.5])])
+
+
+class Image_adapter(nn.Module):
+    def __init__(self, hidden_size=1280, output_size=1024, n_layers=5):
+        super().__init__()
+        self.adapter = nn.Sequential(
+            nn.Linear(hidden_size, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, output_size)
+        )
+        self.mask = nn.Parameter(torch.zeros(n_layers, hidden_size))
+        self.sigmoid = nn.Sigmoid()
+        
+    def forward(self, features):
+        masked = [self.sigmoid(self.mask[i]) * features[i] for i in range(len(features))]
+        return [self.adapter(feature) for feature in masked]
+
+
+def encode_prompt_clip(pipeline, prompt, clip_token, concept='dog'):
+    concept_word = pipeline.tokenizer.tokenize(concept)[0]
+    tokenized = pipeline.tokenizer.tokenize(prompt)
+    concept_idx = -1
+    for i in range(len(tokenized)):
+        if tokenized[i] == concept_word:
+            concept_idx = i
+    assert(concept_idx != -1)
+    concept_idx += 1 # to offset BOS token
+    encoded_prompt = pipeline.text_encoder(**pipeline.tokenizer(prompt, return_tensors='pt') \
+                                           .to(pipeline.text_encoder.device)).last_hidden_state
+    if clip_token.shape[0] > 1:
+        encoded_prompt = encoded_prompt.repeat(clip_token.shape[0], 1, 1)
+    encoded_prompt_before = encoded_prompt[:, :1 + concept_idx]
+    encoded_prompt_after = encoded_prompt[:, concept_idx + 1:]
+    final_prompt = torch.cat((encoded_prompt_before, clip_token), dim=1)
+    if concept_idx != len(tokenized) - 1:
+        final_prompt = torch.cat((final_prompt, encoded_prompt_after), dim=1)
+    return final_prompt    
+
+
+def main(pipeline, image_adapter, device, args):
     image_dir = args.output_dir
     image_dir.mkdir(parents=True, exist_ok=True)
     description = {
@@ -33,6 +83,19 @@ def main(pipeline, device, args):
     if args.no_photo_of:
         prefix_prompt = ""
 
+    if args.add_clip_reference is not None:
+        clip = CLIPVisionModel.from_pretrained("laion/CLIP-ViT-H-14-laion2B-s32B-b79K")
+        image_refs = [clip_transforms(Image.open(args.add_clip_reference / el)).to(device) \
+                      for el in sorted(os.listdir(args.add_clip_reference))]
+        assert(len(image_refs.shape) == 4)
+        image_refs = torch.cat(image_refs, dim=0)
+        img_states = clip(image_refs, output_hidden_states=True)
+        del clip
+
+        img_states = [img_states.hidden_states[i][:, :1, :] for i in (24, 4, 8, 12, 16)]
+        img_states = image_adapter(img_states)
+
+
     for prompt in tqdm(raw_validation_prompts, desc="generating images with advanced prompts"):
         original_prompt = prompt.format("", args.class_name).replace("  ", " ")
 
@@ -51,9 +114,16 @@ def main(pipeline, device, args):
         while len(all_images) < args.num_prompted_images:
             cnt_images = min(args.num_prompted_images - len(all_images),
                              args.sample_batch_size)
+            
+            kwargs = dict(prompt=prompt, num_images_per_prompt=cnt_images)
+            if args.add_clip_reference is not None:
+                curr_refs = random.sample(img_states, cnt_images)
+                kwargs = dict(prompt_embeds=encode_prompt_clip(pipeline, prompt, 
+                                        curr_refs, concept=args.class_name),
+                              )
 
-            images = pipeline(prompt=prompt, num_inference_steps=args.num_inference_steps, 
-                              generator=generator, num_images_per_prompt=cnt_images,
+            images = pipeline(**kwargs, num_inference_steps=args.num_inference_steps, 
+                              generator=generator,
                               verbose=False, eta=args.eta,
                               scale_guidance=args.scale_guidance).images
         
@@ -84,11 +154,16 @@ def main(pipeline, device, args):
 
     for _ in tqdm(range((args.num_baseline_images - 1) // args.sample_batch_size + 1), 
                     desc="generating images with base prompt"):
-        images = pipeline(prompt=baseprompt,
+        kwargs = dict(prompt=baseprompt, num_images_per_prompt=args.sample_batch_size)
+        if args.add_clip_reference is not None:
+            curr_refs = random.sample(img_states, cnt_images)
+            kwargs = dict(prompt_embeds=encode_prompt_clip(pipeline, baseprompt, 
+                                    curr_refs, concept=args.class_name),
+                            )
+        images = pipeline(**kwargs,
                           num_inference_steps=args.num_inference_steps,
                           generator=generator,
                           eta=args.eta,
-                          num_images_per_prompt=args.sample_batch_size,
                           scale_guidance=args.scale_guidance).images
         image_paths = []
         for image in images:
@@ -190,6 +265,11 @@ if __name__ == "__main__":
         type=float,
         default=0.0
     )
+    parser.add_argument(
+        "--add_clip_reference",
+        default=None,
+        type=Path
+    )
     args = parser.parse_args()
     print(args)
     
@@ -199,7 +279,7 @@ if __name__ == "__main__":
     )
     pipeline.safety_checker = None
     pipeline.scheduler = DDPMScheduler.from_config(pipeline.scheduler.config)
-
+    image_adapter = None
 
     if args.checkpoint:
         changed = False
@@ -227,10 +307,16 @@ if __name__ == "__main__":
             assert(not changed)
             pipeline.load_lora_weights(args.checkpoint)
             changed = True
+        if (args.checkpoint / 'adapter.pt').exists():
+            image_adapter = Image_adapter()
+            image_adapter.load_state_dict(torch.load(args.checkpoint / 'adapter.pt'))
+            image_adapter.to(device)
+            changed = True
         assert(changed)
  
     pipeline.set_progress_bar_config(disable=True)    
     pipeline.to(device)
     torch.cuda.empty_cache()
 
-    main(pipeline, device, args)
+    with torch.no_grad():
+        main(pipeline, image_adapter, device, args)
