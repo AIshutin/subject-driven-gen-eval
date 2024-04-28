@@ -92,8 +92,8 @@ def main(pipeline, image_adapter, device, args):
         del clip
 
         img_states = [img_states.hidden_states[i][:, :1, :] for i in (24, 4, 8, 12, 16)]
-        img_states = [torch.cat(image_adapter(img_state), dim=0).unsqueeze(0) for img_state in img_states]
-
+        img_states = torch.cat(img_states, dim=1)
+        img_states = [torch.cat(image_adapter(img_state.unsqueeze(0)), dim=0).unsqueeze(0) for img_state in img_states]
 
     for prompt in tqdm(raw_validation_prompts, desc="generating images with advanced prompts"):
         original_prompt = prompt.format("", args.class_name).replace("  ", " ")
