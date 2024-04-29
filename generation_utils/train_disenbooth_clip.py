@@ -59,6 +59,7 @@ from transformers import CLIPVisionModel
 # Will error if the minimal version of diffusers is not installed. Remove at your own risks.
 
 logger = get_logger(__name__)
+NOPADDING = False
 
 def import_model_class_from_model_name_or_path(pretrained_model_name_or_path: str, revision: str):
     text_encoder_config = PretrainedConfig.from_pretrained(
@@ -85,19 +86,42 @@ def import_model_class_from_model_name_or_path(pretrained_model_name_or_path: st
 
 
 class Image_adapter(nn.Module):
-    def __init__(self, hidden_size=1280, output_size=1024, n_layers=5):
+    def __init__(self, hidden_size=1280, output_size=1024, n_layers=4, do_patches=True):
         super().__init__()
-        self.adapter = nn.Sequential(
+        self.adapter1 = nn.Sequential(
             nn.Linear(hidden_size, hidden_size),
             nn.ReLU(),
             nn.Linear(hidden_size, output_size)
         )
-        self.mask = nn.Parameter(torch.zeros(n_layers, hidden_size))
+        self.mask1 = nn.Parameter(torch.zeros(n_layers, hidden_size))
+        self.do_patches = do_patches
+        if do_patches:
+            self.adapter2 = nn.Sequential(
+                nn.Linear(hidden_size, hidden_size),
+                nn.ReLU(),
+                nn.Linear(hidden_size, output_size)
+            )
+            self.mask2 = nn.Parameter(torch.zeros(n_layers, hidden_size))
         self.sigmoid = nn.Sigmoid()
         
     def forward(self, features):
-        masked = [self.sigmoid(self.mask[i]) * features[i] for i in range(len(features))]
-        return [self.adapter(feature) for feature in masked]
+        assert(len(features.shape) == 4) # bs, layer, tokens, emb
+        layers = features.shape[1]
+        masked_cls = [(self.sigmoid(self.mask1[i]).reshape(1, -1) * features[:, i, 0, :]).unsqueeze(1) \
+                        for i in range(layers)]
+        masked_cls = torch.cat(masked_cls, dim=1)
+        assert(len(masked_cls.shape) == 3) # B, L, E
+        masked_cls = self.adapter1(masked_cls)
+
+        if self.do_patches:
+            masked_patches = [(self.sigmoid(self.mask2[i]).reshape(1, 1, -1) * features[:, i, 1:, :]).unsqueeze(1) \
+                            for i in range(layers)]
+            masked_patches = torch.cat(masked_patches, dim=1)
+            assert(len(masked_patches.shape) == 4) # B, L, T, E
+            masked_patches = self.adapter2(masked_patches).mean(dim=-2)
+            assert(masked_cls.shape == masked_patches.shape)
+            return masked_cls + masked_patches
+        return masked_cls
 
 
 def encode_prompt_clip(pipeline, prompt, clip_token, concept='dog'):
@@ -111,7 +135,6 @@ def encode_prompt_clip(pipeline, prompt, clip_token, concept='dog'):
     concept_idx += 1 # to offset BOS token
     encoded_prompt = pipeline.text_encoder(**pipeline.tokenizer(prompt, return_tensors='pt') \
                                            .to(pipeline.text_encoder.device)).last_hidden_state
-    print(encoded_prompt.shape, concept_idx)
     encoded_prompt_before = encoded_prompt[:, :1 + concept_idx]
     encoded_prompt_after = encoded_prompt[:, concept_idx + 1:]
     final_prompt = torch.cat((encoded_prompt_before, clip_token), dim=1)
@@ -140,6 +163,14 @@ def parse_args(input_args=None):
         "--concept",
         type=str,
         required=True,
+    )
+    parser.add_argument(
+        "--nopadding",
+        action='store_true',
+    )
+    parser.add_argument(
+        "--do_patches",
+        action='store_true',
     )
     parser.add_argument(
         "--revision",
@@ -439,6 +470,10 @@ def parse_args(input_args=None):
         args = parser.parse_args(input_args)
     else:
         args = parser.parse_args()
+    
+    global NOPADDING
+    NOPADDING = args.nopadding
+
 
     env_local_rank = int(os.environ.get("LOCAL_RANK", -1))
     if env_local_rank != -1 and env_local_rank != args.local_rank:
@@ -616,14 +651,22 @@ def tokenize_prompt(tokenizer, prompt, tokenizer_max_length=None):
         max_length = tokenizer_max_length
     else:
         max_length = tokenizer.model_max_length
+    max_length = max_length - 4 # CLIP tokens
 
-    text_inputs = tokenizer(
-        prompt,
-        truncation=True,
-        padding="max_length",
-        max_length=max_length,
-        return_tensors="pt",
-    )
+    if NOPADDING:
+        text_inputs = tokenizer(
+            prompt,
+            truncation=True,
+            padding="max_length",
+            max_length=max_length,
+            return_tensors="pt",
+        )
+    else:
+        text_inputs = tokenizer(
+            prompt,
+            return_tensors="pt",
+        )
+
 
     return text_inputs
 
@@ -726,7 +769,7 @@ def main(args):
     clip_trans = transforms.Resize( (224, 224), interpolation=transforms.InterpolationMode.BILINEAR )
     #img_model, _, preprocess = open_clip.create_model_and_transforms('ViT-H-14', pretrained='laion2b_s32b_b79k') 
     img_model = CLIPVisionModel.from_pretrained("laion/CLIP-ViT-H-14-laion2B-s32B-b79K")
-    img_adapter = Image_adapter()
+    img_adapter = Image_adapter(do_patches=args.do_patches)
 
     # We only train the additional adapter LoRA layers
     if vae is not None:
@@ -1027,7 +1070,6 @@ def main(args):
         disable=not accelerator.is_local_main_process,
     )
 
-    print(text_encoder)
     for epoch in range(first_epoch, args.num_train_epochs):
         unet.train()
         if args.train_text_encoder:
@@ -1065,13 +1107,12 @@ def main(args):
                     )
                 with torch.no_grad():
                     img_states = img_model(clip_trans(pixel_values), output_hidden_states=True)
-                    img_states = [img_states.hidden_states[i][:, :1, :] for i in (24, 4, 8, 12, 16)]
-
+                    img_states = [img_states.hidden_states[i].unsqueeze(1) for i in (4, 8, 12, 16)]
+                    img_states = torch.cat(img_states, dim=1)
                 # Predict the noise residual
                 # print('img_states[0]', img_states[0].shape)
                 img_states = img_adapter(img_states)
                 # print('img_states[0] (after adapter)', img_states[0].shape)
-                img_states = torch.cat(img_states, dim=1)
 
                 if accelerator.unwrap_model(unet).config.in_channels == channels * 2:
                     noisy_model_input = torch.cat([noisy_model_input, noisy_model_input], dim=1)
@@ -1107,7 +1148,7 @@ def main(args):
                 loss_aux2 = 0
                 for i in range(img_states.shape[0]):
                     loss_aux2 += cal_cos(encoder_hidden_states, img_states[i].unsqueeze(0), cos)
-                loss_aux2 /= len(img_states.shape[0])
+                loss_aux2 /= img_states.shape[0]
                 loss = main_loss + 0.01*loss_aux1 + 0.001*loss_aux2
 
                 accelerator.backward(loss)
@@ -1142,76 +1183,90 @@ def main(args):
                             f"Running validation... \n Generating {args.num_validation_images} images with prompt:"
                             f" {args.validation_prompt}."
                         )
-                        # create pipeline
-                        pipeline = DiffusionPipeline.from_pretrained(
-                            args.pretrained_model_name_or_path,
-                            unet=accelerator.unwrap_model(unet),
-                            text_encoder=None if args.pre_compute_text_embeddings else accelerator.unwrap_model(text_encoder),
-                            revision=args.revision,
-                            torch_dtype=weight_dtype,
-                        )
 
-                        # We train on the simplified learning objective. If we were previously predicting a variance, we need the scheduler to ignore it
-                        scheduler_args = {}
+                        def log_validation(embed_ref):
+                            # create pipeline
+                            pipeline = DiffusionPipeline.from_pretrained(
+                                args.pretrained_model_name_or_path,
+                                unet=accelerator.unwrap_model(unet),
+                                text_encoder=None if args.pre_compute_text_embeddings else accelerator.unwrap_model(text_encoder),
+                                revision=args.revision,
+                                torch_dtype=weight_dtype,
+                            )
 
-                        if "variance_type" in pipeline.scheduler.config:
-                            variance_type = pipeline.scheduler.config.variance_type
+                            # We train on the simplified learning objective. If we were previously predicting a variance, we need the scheduler to ignore it
+                            scheduler_args = {}
 
-                            if variance_type in ["learned", "learned_range"]:
-                                variance_type = "fixed_small"
+                            if "variance_type" in pipeline.scheduler.config:
+                                variance_type = pipeline.scheduler.config.variance_type
 
-                            scheduler_args["variance_type"] = variance_type
+                                if variance_type in ["learned", "learned_range"]:
+                                    variance_type = "fixed_small"
 
-                        pipeline.scheduler = DPMSolverMultistepScheduler.from_config(
-                            pipeline.scheduler.config, **scheduler_args
-                        )
+                                scheduler_args["variance_type"] = variance_type
 
-                        pipeline = pipeline.to(accelerator.device)
-                        pipeline.set_progress_bar_config(disable=True)
+                            pipeline.scheduler = DPMSolverMultistepScheduler.from_config(
+                                pipeline.scheduler.config, **scheduler_args
+                            )
 
-                        # run inference
-                        generator = torch.Generator(device=accelerator.device).manual_seed(args.seed) if args.seed else None
+                            pipeline = pipeline.to(accelerator.device)
+                            pipeline.set_progress_bar_config(disable=True)
 
-                        images = []
+                            # run inference
+                            generator = torch.Generator(device=accelerator.device).manual_seed(args.seed) if args.seed else None
+
+                            images = []
 
 
-                        for _ in range(args.num_validation_images):
-                            for prompt in args.validation_prompt:
-                                valid_ref = train_dataset[_ % len(train_dataset)]["instance_images"]
-                                valid_ref = valid_ref.to(memory_format=torch.contiguous_format).float()
-                                valid_ref = valid_ref.to(dtype=weight_dtype, device=accelerator.device)
-                                valid_ref = valid_ref.unsqueeze(0)
+                            for _ in range(args.num_validation_images):
+                                for prompt in args.validation_prompt:
+                                    if embed_ref:
+                                        valid_ref = train_dataset[_ % len(train_dataset)]["instance_images"]
+                                        valid_ref = valid_ref.to(memory_format=torch.contiguous_format).float()
+                                        valid_ref = valid_ref.to(dtype=weight_dtype, device=accelerator.device)
+                                        valid_ref = valid_ref.unsqueeze(0)
 
-                                with torch.no_grad():
-                                    img_states = img_model(clip_trans(valid_ref), output_hidden_states=True)
-                                    img_states = [img_states.hidden_states[i][:, :1, :] for i in (24, 4, 8, 12, 16)]
-                                    img_states = img_adapter(img_states)
-                                    img_states = torch.cat(img_states, dim=1)
+                                        with torch.no_grad():
+                                            img_states = img_model(clip_trans(valid_ref), output_hidden_states=True)
+                                            img_states = [img_states.hidden_states[i].unsqueeze(1) for i in (4, 8, 12, 16)]
+                                            img_states = torch.cat(img_states, dim=1)
+                                            img_states = img_adapter(img_states)
 
-                                with torch.cuda.amp.autocast():
-                                    encoded_prompt = encode_prompt_clip(pipeline, prompt, img_states,
-                                                                        args.concept)
-                                    image = pipeline(prompt_embeds=encoded_prompt,
-                                                    num_inference_steps=25,
-                                                    generator=generator).images[0]
-                                    images.append(image)
+                                    with torch.cuda.amp.autocast():
+                                        if embed_ref:
+                                            encoded_prompt = encode_prompt_clip(pipeline, prompt, img_states,
+                                                                                args.concept)
+                                            image = pipeline(prompt_embeds=encoded_prompt,
+                                                            num_inference_steps=25,
+                                                            generator=generator).images[0]
+                                        else:
+                                            image = pipeline(prompt=prompt,
+                                                             num_inference_steps=25,
+                                                             generator=generator).images[0]
 
-                        for tracker in accelerator.trackers:
-                            if tracker.name == "tensorboard":
-                                np_images = np.stack([np.asarray(img) for img in images])
-                                tracker.writer.add_images("test", np_images, epoch, dataformats="NHWC")
-                            if tracker.name == "wandb":
-                                tracker.log(
-                                    {
-                                        "test": [
-                                            wandb.Image(image, caption=f"{i}: {args.validation_prompt[i % len(args.validation_prompt)]}")
-                                            for i, image in enumerate(images)
-                                        ]
-                                    }
-                                )
+                                        images.append(image)
 
-                        del pipeline
-                        torch.cuda.empty_cache()
+                            for tracker in accelerator.trackers:
+                                suffix = ' wo ref'
+                                if embed_ref:
+                                    suffix = ' w ref'
+                                if tracker.name == "tensorboard":
+                                    np_images = np.stack([np.asarray(img) for img in images])
+                                    tracker.writer.add_images("test" + suffix, np_images, epoch, dataformats="NHWC")
+                                if tracker.name == "wandb":
+                                    tracker.log(
+                                        {
+                                            "test" + suffix: [
+                                                wandb.Image(image, caption=f"{i}: {args.validation_prompt[i % len(args.validation_prompt)]}")
+                                                for i, image in enumerate(images)
+                                            ]
+                                        }
+                                    )
+
+                            del pipeline
+                            torch.cuda.empty_cache()
+                        log_validation(False)
+                        log_validation(True)
 
             logs = {"loss": loss.detach().item(), 
                     "lr": lr_scheduler.get_last_lr()[0],

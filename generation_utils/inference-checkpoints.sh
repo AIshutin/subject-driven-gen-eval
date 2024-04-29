@@ -39,18 +39,21 @@ then
 fi
 if [ $1 = "disenbooth-clip" ]
 then
-    FLAGS="--no_photo_of --scale_guidance 7.0 --add_class_name --add_clip_reference datasets/dreambooth/$3 "
+    FLAGS="--no_photo_of --scale_guidance 7.0 --add_class_name "
+    # add to flag if you want references: --add_clip_reference datasets/dreambooth/$3
     DESCRIPTOR="--descriptor $4</w>"
 fi
 
 for checkpoint_dir in checkpoints/$1-$5/$3/sd2.1/checkpoint-*; do
     CHECKPOINT=" --checkpoint $checkpoint_dir "
+    dir="${generated%/}"
+    subdir="${dir##*/}"
     python3 generation_utils/inference.py \
         $CHECKPOINT \
         --prompts $PROMPTS \
         --class_name $4 \
         $DESCRIPTOR \
-        --output_dir generated/$1-$5/$3/sd2.1/$checkpoint_dir \
+        --output_dir generated/$1-$5/$3/sd2.1/$subdir \
         --seed $5 $FLAGS --num_baseline_images 1 \
     #        --num_prompted_images 1 --num_baseline_images 25
 done

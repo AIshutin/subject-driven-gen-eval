@@ -5,8 +5,8 @@ export CLASS_NAME=$2
 export MODEL_NAME="stabilityai/stable-diffusion-2-1-base"
 export INSTANCE_DIR="datasets/dreambooth/${SUBJECT_NAME}"
 export CLASS_DIR="../synth-dataset-sd-2-1/${CLASS_NAME}"
-export OUTPUT_DIR="checkpoints/disenbooth-clip/${SUBJECT_NAME}/sd2.1"
-export WANDB_NAME="disenbooth-clip-sd2.1-${SUBJECT_NAME}-${CLASS_NAME}"
+export OUTPUT_DIR="checkpoints/disenbooth-clip2/${SUBJECT_NAME}/sd2.1"
+export WANDB_NAME="disenbooth-clip2-sd2.1-${SUBJECT_NAME}-${CLASS_NAME}"
 
 accelerate launch generation_utils/train_disenbooth_clip.py \
   --pretrained_model_name_or_path=$MODEL_NAME  \

@@ -27,19 +27,42 @@ clip_transforms = transforms.Compose([
 
 
 class Image_adapter(nn.Module):
-    def __init__(self, hidden_size=1280, output_size=1024, n_layers=5):
+    def __init__(self, hidden_size=1280, output_size=1024, n_layers=4, do_patches=True):
         super().__init__()
-        self.adapter = nn.Sequential(
+        self.adapter1 = nn.Sequential(
             nn.Linear(hidden_size, hidden_size),
             nn.ReLU(),
             nn.Linear(hidden_size, output_size)
         )
-        self.mask = nn.Parameter(torch.zeros(n_layers, hidden_size))
+        self.mask1 = nn.Parameter(torch.zeros(n_layers, hidden_size))
+        self.do_patches = do_patches
+        if do_patches:
+            self.adapter2 = nn.Sequential(
+                nn.Linear(hidden_size, hidden_size),
+                nn.ReLU(),
+                nn.Linear(hidden_size, output_size)
+            )
+            self.mask2 = nn.Parameter(torch.zeros(n_layers, hidden_size))
         self.sigmoid = nn.Sigmoid()
         
     def forward(self, features):
-        masked = [self.sigmoid(self.mask[i]) * features[i] for i in range(len(features))]
-        return [self.adapter(feature) for feature in masked]
+        assert(len(features.shape) == 4) # bs, layer, tokens, emb
+        layers = features.shape[1]
+        masked_cls = [(self.sigmoid(self.mask1[i]).reshape(1, -1) * features[:, i, 0, :]).unsqueeze(1) \
+                        for i in range(layers)]
+        masked_cls = torch.cat(masked_cls, dim=1)
+        assert(len(masked_cls.shape) == 3) # B, L, E
+        masked_cls = self.adapter1(masked_cls)
+
+        if self.do_patches:
+            masked_patches = [(self.sigmoid(self.mask2[i]).reshape(1, 1, -1) * features[:, i, 1:, :]).unsqueeze(1) \
+                            for i in range(layers)]
+            masked_patches = torch.cat(masked_patches, dim=1)
+            assert(len(masked_patches.shape) == 4) # B, L, T, E
+            masked_patches = self.adapter2(masked_patches).mean(dim=-2)
+            assert(masked_cls.shape == masked_patches.shape)
+            return masked_cls + masked_patches
+        return masked_cls
 
 
 def encode_prompt_clip(pipeline, prompt, clip_token, concept='dog'):
@@ -90,11 +113,11 @@ def main(pipeline, image_adapter, device, args):
         image_refs = torch.cat(image_refs, dim=0)
         img_states = clip(image_refs, output_hidden_states=True)
         del clip
-
-        img_states = [img_states.hidden_states[i][:, :1, :] for i in (24, 4, 8, 12, 16)]
+        img_states = [img_states.hidden_states[i].unsqueeze(1) for i in (4, 8, 12, 16)]
         img_states = torch.cat(img_states, dim=1)
-        img_states = [torch.cat(image_adapter(img_state.unsqueeze(0)), dim=0).unsqueeze(0) for img_state in img_states]
-
+        img_states = image_adapter(img_states)
+        img_states = [img_states[i].unsqueeze(0) for i in range(img_states.shape[0])]
+    
     for prompt in tqdm(raw_validation_prompts, desc="generating images with advanced prompts"):
         original_prompt = prompt.format("", args.class_name).replace("  ", " ")
 
@@ -309,9 +332,15 @@ if __name__ == "__main__":
             pipeline.load_lora_weights(args.checkpoint)
             changed = True
         if (args.checkpoint / 'adapter.pt').exists():
-            image_adapter = Image_adapter()
-            image_adapter.load_state_dict(torch.load(args.checkpoint / 'adapter.pt'))
-            image_adapter.to(device)
+            try:
+                image_adapter = Image_adapter(do_patches=False)
+                image_adapter.load_state_dict(torch.load(args.checkpoint / 'adapter.pt'), strict=True)
+                image_adapter.to(device)
+            except:
+                image_adapter = Image_adapter(do_patches=True)
+                image_adapter.load_state_dict(torch.load(args.checkpoint / 'adapter.pt'), strict=True)
+                image_adapter.to(device)
+
             changed = True
         assert(changed)
  
