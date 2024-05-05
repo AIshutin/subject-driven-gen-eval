@@ -337,9 +337,14 @@ if __name__ == "__main__":
                 image_adapter.load_state_dict(torch.load(args.checkpoint / 'adapter.pt'), strict=True)
                 image_adapter.to(device)
             except:
-                image_adapter = Image_adapter(do_patches=True)
-                image_adapter.load_state_dict(torch.load(args.checkpoint / 'adapter.pt'), strict=True)
-                image_adapter.to(device)
+                try:
+                    image_adapter = Image_adapter(do_patches=True)
+                    image_adapter.load_state_dict(torch.load(args.checkpoint / 'adapter.pt'), strict=True)
+                    image_adapter.to(device)
+                except Exception as exp:
+                    print(exp)
+                    image_adapter = None
+
 
             changed = True
         assert(changed)

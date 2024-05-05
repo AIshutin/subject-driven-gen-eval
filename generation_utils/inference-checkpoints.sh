@@ -37,7 +37,7 @@ then
     FLAGS="--no_photo_of --scale_guidance 7.0 --add_class_name"
     DESCRIPTOR="--descriptor $4</w>"
 fi
-if [ $1 = "disenbooth-clip" ]
+if [ $1 = "disenbooth-clip" -o $1 = "disenbooth_noadapter" -o $1 = "disenbooth-clip2" -o $1 = "disenbooth-clip2-patch"  -o $1 = "disenbooth-clip2-add" -o $1 = "disenbooth-clip2-add-patch" ]
 then
     FLAGS="--no_photo_of --scale_guidance 7.0 --add_class_name "
     # add to flag if you want references: --add_clip_reference datasets/dreambooth/$3
@@ -45,8 +45,8 @@ then
 fi
 
 for checkpoint_dir in checkpoints/$1-$5/$3/sd2.1/checkpoint-*; do
-    CHECKPOINT=" --checkpoint $checkpoint_dir "
-    dir="${generated%/}"
+    CHECKPOINT=" --check=point $checkpoint_dir "
+    dir="${checkpoint_dir%/}"
     subdir="${dir##*/}"
     python3 generation_utils/inference.py \
         $CHECKPOINT \
