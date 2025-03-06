@@ -1,6 +1,6 @@
 # subject-driven-gen-eval
 
-[WIP] Utils to evaluate subject-driven generation methods like Dreambooth.
+My modifications to subject-driven generation methods like Dreambooth and utils to evaluate them.
 
 ### Installation
 
